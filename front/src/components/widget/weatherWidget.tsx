@@ -84,7 +84,7 @@ export default function WeatherWidget() {
     );
   }
 
-  if (!weatherData) {
+  if (!weatherData || !weatherData.weather || !weatherData.weather[0]) {
     return (
       <div className="text-center py-4">
         <div className="text-4xl mb-2">🌤️</div>

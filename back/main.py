@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 # 환경변수 로드
-load_dotenv('env.local')
+load_dotenv()
 
 app = FastAPI(
     title="Untold API",

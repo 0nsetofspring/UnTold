@@ -15,7 +15,7 @@ export default function Navigation() {
             <Link href="/dashboard" className="text-gray-700 hover:text-primary-600 transition-colors">
               🌅 대시보드
             </Link>
-            <Link href="/write-diary" className="text-gray-700 hover:text-primary-600 transition-colors">
+            <Link href="/diary/writeDiary" className="text-gray-700 hover:text-primary-600 transition-colors">
               📝 일기 작성
             </Link>
             <Link href="/widget-store" className="text-gray-700 hover:text-primary-600 transition-colors">

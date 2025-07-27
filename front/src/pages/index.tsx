@@ -61,7 +61,7 @@ export default function Home() {
               onClick={handleLogin}
               className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
-              🚀 시작하기
+              🚀 로그인/회원가입 하기
             </button>
           </div>
 

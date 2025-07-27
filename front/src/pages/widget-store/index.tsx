@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Navigation from '@/components/Navigation';
 
@@ -14,98 +14,88 @@ interface Widget {
 export default function WidgetStore() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [widgets, setWidgets] = useState<Widget[]>([]);
 
-  const widgets: Widget[] = [
+  // 초기 위젯 데이터
+  const initialWidgets: Widget[] = [
+    {
+      id: 'random-dog',
+      name: '오늘의 강아지',
+      description: '매일 새로운 강아지 사진을 감상하세요',
+      icon: '🐶',
+      category: 'entertainment',
+      isInstalled: false
+    },
+    {
+      id: 'advice',
+      name: '오늘의 명언',
+      description: '매일 새로운 명언을 감상하세요',
+      icon: '💭',
+      category: 'information',
+      isInstalled: false
+    },
+    {
+      id: 'book',
+      name: '주목할 만한 신간 리스트',
+      description: '알라딘 주목할 만한 신간 리스트를 감상하세요',
+      icon: '📚',
+      category: 'information',
+      isInstalled: false
+    },
     {
       id: 'weather',
       name: '날씨',
-      description: '실시간 날씨 정보를 확인하세요',
+      description: '오늘의 날씨를 확인하세요',
       icon: '🌤️',
       category: 'information',
-      isInstalled: true
+      isInstalled: false
     },
     {
       id: 'news',
       name: '뉴스',
-      description: '최신 뉴스를 한눈에 보세요',
+      description: '오늘의 뉴스를 확인하세요',
       icon: '📰',
       category: 'information',
-      isInstalled: true
-    },
-    {
-      id: 'exchange',
-      name: '환율',
-      description: '실시간 환율 정보를 확인하세요',
-      icon: '💱',
-      category: 'information',
-      isInstalled: true
-    },
-    {
-      id: 'nasa',
-      name: 'NASA',
-      description: '매일 새로운 우주 사진을 감상하세요',
-      icon: '🚀',
-      category: 'entertainment',
-      isInstalled: true
-    },
-    {
-      id: 'quote',
-      name: '명언',
-      description: '영감을 주는 명언을 매일 받아보세요',
-      icon: '💭',
-      category: 'entertainment',
-      isInstalled: true
-    },
-    {
-      id: 'emotion',
-      name: '감정 분석',
-      description: 'AI가 분석한 당신의 감정 상태',
-      icon: '😊',
-      category: 'ai',
-      isInstalled: true
-    },
-    {
-      id: 'todo',
-      name: '할 일',
-      description: '오늘의 할 일을 관리하세요',
-      icon: '✅',
-      category: 'productivity',
-      isInstalled: false
-    },
-    {
-      id: 'calendar',
-      name: '캘린더',
-      description: '일정을 한눈에 확인하세요',
-      icon: '📅',
-      category: 'productivity',
-      isInstalled: false
-    },
-    {
-      id: 'music',
-      name: '음악 추천',
-      description: '기분에 맞는 음악을 추천받으세요',
-      icon: '🎵',
-      category: 'entertainment',
-      isInstalled: false
-    },
-    {
-      id: 'health',
-      name: '건강 체크',
-      description: '일일 건강 상태를 기록하세요',
-      icon: '💪',
-      category: 'health',
       isInstalled: false
     }
   ];
 
   const categories = [
     { id: 'all', name: '전체', icon: '📦' },
-    { id: 'information', name: '정보', icon: '📊' },
     { id: 'entertainment', name: '엔터테인먼트', icon: '🎮' },
-    { id: 'productivity', name: '생산성', icon: '⚡' },
-    { id: 'ai', name: 'AI', icon: '🤖' },
-    { id: 'health', name: '건강', icon: '🏥' }
+    { id: 'information', name: '정보', icon: '📊' }
   ];
+
+  // localStorage에서 설치된 위젯 불러오기
+  useEffect(() => {
+    const savedWidgets = localStorage.getItem('installedWidgets');
+    if (savedWidgets) {
+      const installedIds = JSON.parse(savedWidgets);
+      const updatedWidgets = initialWidgets.map(widget => ({
+        ...widget,
+        isInstalled: installedIds.includes(widget.id)
+      }));
+      setWidgets(updatedWidgets);
+    } else {
+      setWidgets(initialWidgets);
+    }
+  }, []);
+
+  // 위젯 설치/제거 함수
+  const toggleWidget = (widgetId: string) => {
+    const updatedWidgets = widgets.map(widget => 
+      widget.id === widgetId 
+        ? { ...widget, isInstalled: !widget.isInstalled }
+        : widget
+    );
+    setWidgets(updatedWidgets);
+
+    // localStorage에 저장
+    const installedIds = updatedWidgets
+      .filter(w => w.isInstalled)
+      .map(w => w.id);
+    localStorage.setItem('installedWidgets', JSON.stringify(installedIds));
+  };
 
   const filteredWidgets = widgets.filter(widget => {
     const matchesCategory = selectedCategory === 'all' || widget.category === selectedCategory;
@@ -176,14 +166,14 @@ export default function WidgetStore() {
                 <p className="text-gray-600 text-sm mb-4">{widget.description}</p>
                 
                 <button
+                  onClick={() => toggleWidget(widget.id)}
                   className={`w-full py-2 px-4 rounded-lg transition-colors ${
                     widget.isInstalled
-                      ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
                       : 'btn-primary'
                   }`}
-                  disabled={widget.isInstalled}
                 >
-                  {widget.isInstalled ? '설치됨' : '설치하기'}
+                  {widget.isInstalled ? '제거하기' : '추가하기'}
                 </button>
               </div>
             ))}
@@ -199,11 +189,19 @@ export default function WidgetStore() {
                     <span className="text-2xl">{widget.icon}</span>
                     <span className="font-medium">{widget.name}</span>
                   </div>
-                  <button className="text-red-500 hover:text-red-700 text-sm">
+                  <button 
+                    onClick={() => toggleWidget(widget.id)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
                     제거
                   </button>
                 </div>
               ))}
+              {widgets.filter(w => w.isInstalled).length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-8">
+                  아직 추가된 위젯이 없습니다. 위에서 원하는 위젯을 추가해보세요!
+                </div>
+              )}
             </div>
           </div>
         </div>

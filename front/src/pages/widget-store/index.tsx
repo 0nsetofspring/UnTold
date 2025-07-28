@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Navigation from '@/components/Navigation';
 
+import { supabase } from '@/api/supabaseClient'; // Supabase 클라이언트 import
+import axios from 'axios'; // API 호출을 위해 axios 사용
+
 interface Widget {
   id: string;
   name: string;
@@ -18,6 +21,7 @@ export default function WidgetStore() {
   const [searchTerm, setSearchTerm] = useState('');
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // 초기 위젯 데이터
   const initialWidgets: Widget[] = [
@@ -119,35 +123,64 @@ export default function WidgetStore() {
     { id: 'information', name: '정보', icon: '📊', count: initialWidgets.filter(w => w.category === 'information').length }
   ];
 
-  // localStorage에서 설치된 위젯 불러오기
+  // 현재 로그인한 사용자 ID 가져오기
   useEffect(() => {
-    const savedWidgets = localStorage.getItem('installedWidgets');
-    if (savedWidgets) {
-      const installedIds = JSON.parse(savedWidgets);
-      const updatedWidgets = initialWidgets.map(widget => ({
-        ...widget,
-        isInstalled: installedIds.includes(widget.id)
-      }));
-      setWidgets(updatedWidgets);
-    } else {
-      setWidgets(initialWidgets);
-    }
-  }, []);
+    const initializeWidgets = async () => {
+      // 1. 현재 사용자 세션을 가져옵니다.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUserId(session.user.id);
+        try {
+          // 2. DB에서 설치된 위젯 목록을 가져옵니다.
+          const response = await axios.get(`/api/widgets/user/${session.user.id}`);
+          const installedIds = response.data.map((w: any) => w.widget_name);
 
-  // 위젯 설치/제거 함수
-  const toggleWidget = (widgetId: string) => {
-    const updatedWidgets = widgets.map(widget => 
-      widget.id === widgetId 
+          // 3. 초기 위젯 목록과 DB 정보를 합쳐 최종 상태를 만듭니다.
+          const updatedWidgets = initialWidgets.map(widget => ({
+            ...widget,
+            isInstalled: installedIds.includes(widget.id)
+          }));
+          setWidgets(updatedWidgets);
+        } catch (error) {
+          console.error("설치된 위젯 목록 로딩 실패:", error);
+          setWidgets(initialWidgets); // 실패 시 기본값으로 설정
+        }
+      } else {
+        // 세션이 없으면 위젯 목록을 기본 상태로 설정
+        setWidgets(initialWidgets);
+      }
+    };
+
+    initializeWidgets();
+  }, []); // 빈 의존성 배열로 최초 1회만 실행
+
+  // 위젯 설치/제거 함수 (API 호출로 변경)
+  const toggleWidget = async (widgetId: string) => {
+    if (!userId) return; // 사용자 ID가 없으면 함수 종료
+
+    const updatedWidgets = widgets.map(widget =>
+      widget.id === widgetId
         ? { ...widget, isInstalled: !widget.isInstalled }
         : widget
     );
     setWidgets(updatedWidgets);
 
-    // localStorage에 저장
-    const installedIds = updatedWidgets
+    // DB에 저장할 위젯 목록 (설치된 것만)
+    const widgetsToSave = updatedWidgets
       .filter(w => w.isInstalled)
-      .map(w => w.id);
-    localStorage.setItem('installedWidgets', JSON.stringify(installedIds));
+      .map((w, index) => ({
+        widget_name: w.id,
+        position: index
+      }));
+
+    try {
+      // 백엔드 API를 호출하여 DB에 저장
+      await axios.post(`/api/widgets/user/${userId}`, widgetsToSave);
+    } catch (error) {
+      console.error("위젯 설정 저장 실패:", error);
+      // 에러 발생 시 UI를 원래 상태로 되돌릴 수 있습니다.
+      // setWidgets(widgets);
+    }
   };
 
   const filteredWidgets = widgets.filter(widget => {

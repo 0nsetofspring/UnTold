@@ -9,61 +9,74 @@ interface Widget {
   icon: string;
   category: string;
   isInstalled: boolean;
+  color: string;
+  features: string[];
 }
 
 export default function WidgetStore() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [widgets, setWidgets] = useState<Widget[]>([]);
+  const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
 
   // 초기 위젯 데이터
   const initialWidgets: Widget[] = [
     {
       id: 'random-dog',
       name: '오늘의 강아지',
-      description: '매일 새로운 강아지 사진을 감상하세요',
+      description: '매일 새로운 귀여운 강아지 사진으로 하루를 시작하세요',
       icon: '🐶',
       category: 'entertainment',
-      isInstalled: false
+      isInstalled: false,
+      color: 'from-rose-200 to-pink-300',
+      features: ['매일 새로운 강아지', '귀여움 충전', '즐거운 하루 시작']
     },
     {
       id: 'advice',
       name: '오늘의 명언',
-      description: '매일 새로운 명언을 감상하세요',
+      description: '영감을 주는 명언으로 하루의 동기부여를 받으세요',
       icon: '💭',
       category: 'information',
-      isInstalled: false
+      isInstalled: false,
+      color: 'from-blue-200 to-indigo-300',
+      features: ['매일 새로운 명언', '동기부여', '지혜로운 한마디']
     },
     {
       id: 'book',
-      name: '주목할 만한 신간 리스트',
-      description: '알라딘 주목할 만한 신간 리스트를 감상하세요',
+      name: '주목할 만한 신간',
+      description: '알라딘에서 선별한 주목할 만한 신간 도서를 확인하세요',
       icon: '📚',
       category: 'information',
-      isInstalled: false
+      isInstalled: false,
+      color: 'from-emerald-200 to-teal-300',
+      features: ['신간 도서 추천', '베스트셀러 정보', '독서 문화']
     },
     {
       id: 'weather',
-      name: '날씨',
-      description: '오늘의 날씨를 확인하세요',
+      name: '실시간 날씨',
+      description: '정확한 날씨 정보로 하루를 계획하세요',
       icon: '🌤️',
       category: 'information',
-      isInstalled: false
+      isInstalled: false,
+      color: 'from-amber-200 to-orange-300',
+      features: ['실시간 날씨', '체감온도', '일출/일몰 시간']
     },
     {
       id: 'news',
-      name: '뉴스',
-      description: '오늘의 뉴스를 확인하세요',
+      name: '오늘의 뉴스',
+      description: '최신 뉴스로 세상의 흐름을 파악하세요',
       icon: '📰',
       category: 'information',
-      isInstalled: false
+      isInstalled: false,
+      color: 'from-red-200 to-rose-300',
+      features: ['최신 뉴스', '다양한 카테고리', '실시간 업데이트']
     }
   ];
 
   const categories = [
-    { id: 'all', name: '전체', icon: '📦' },
-    { id: 'entertainment', name: '엔터테인먼트', icon: '🎮' },
-    { id: 'information', name: '정보', icon: '📊' }
+    { id: 'all', name: '전체', icon: '📦', count: initialWidgets.length },
+    { id: 'entertainment', name: '엔터테인먼트', icon: '🎮', count: initialWidgets.filter(w => w.category === 'entertainment').length },
+    { id: 'information', name: '정보', icon: '📊', count: initialWidgets.filter(w => w.category === 'information').length }
   ];
 
   // localStorage에서 설치된 위젯 불러오기
@@ -104,6 +117,8 @@ export default function WidgetStore() {
     return matchesCategory && matchesSearch;
   });
 
+  const installedCount = widgets.filter(w => w.isInstalled).length;
+
   return (
     <>
       <Head>
@@ -111,38 +126,104 @@ export default function WidgetStore() {
         <meta name="description" content="다양한 위젯을 선택하여 대시보드를 커스터마이징하세요" />
       </Head>
       <Navigation />
-      <main className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-6">
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6">
         <div className="max-w-7xl mx-auto">
           {/* 헤더 */}
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">🛍️ 위젯 스토어</h1>
-            <p className="text-gray-600">원하는 위젯을 선택하여 대시보드를 커스터마이징하세요</p>
+          <header className="mb-8 text-center relative overflow-hidden">
+            {/* 배경 위젯 애니메이션 */}
+            <div className="absolute inset-0 pointer-events-none z-0">
+              <span
+                className="absolute left-[8%] top-20 text-[3rem] opacity-20 animate-floating"
+                style={{ animationDuration: '7s', animationTimingFunction: 'ease-in-out' }}
+              >📚</span>
+              <span
+                className="absolute right-[8%] top-32 text-[3rem] opacity-20 animate-floating"
+                style={{ animationDuration: '9s', animationTimingFunction: 'ease-in-out', animationDelay: '1s' }}
+              >🌤️</span>
+              <span
+                className="absolute left-[20%] bottom-10 text-[3rem] opacity-20 animate-floating"
+                style={{ animationDuration: '8s', animationTimingFunction: 'ease-in-out', animationDelay: '2s' }}
+              >💭</span>
+              <span
+                className="absolute right-[20%] bottom-20 text-[3rem] opacity-20 animate-floating"
+                style={{ animationDuration: '10s', animationTimingFunction: 'ease-in-out', animationDelay: '2.5s' }}
+              >🐶</span>
+              <span
+                className="absolute left-[30%] top-1/2 text-[3rem] opacity-20 animate-floating"
+                style={{ animationDuration: '7s', animationTimingFunction: 'ease-in-out', animationDelay: '3s' }}
+              >📰</span>
+              <span
+                className="absolute right-[30%] top-1/4 text-[3rem] opacity-20 animate-floating"
+                style={{ animationDuration: '8.5s', animationTimingFunction: 'ease-in-out', animationDelay: '1.7s' }}
+              >📈</span>
+            </div>
+
+            {/* 1. GIF 애니메이션 */}
+            <div className="mt-20 mb-8">
+              <img 
+                src="/widgetStore.gif" 
+                alt="위젯 스토어 애니메이션"
+                className="w-24 h-24 mx-auto"
+              />
+            </div>
+
+            {/* 2. 제목 */}
+            <h1 className="text-4xl font-bold text-gray-800 mb-6 animate-fade-in">
+              위젯 스토어
+            </h1>
+
+            {/* 3. 설명 */}
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto animate-fade-in-delay mb-8">
+              원하는 위젯을 선택하여 나만의 특별한 대시보드를 만들어보세요
+            </p>
+
+            {/* 4. 설치 상태 */}
+            {installedCount > 0 && (
+              <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium animate-fade-in-delay-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                {installedCount}개 위젯 설치됨
+              </div>
+            )}
           </header>
 
           {/* 검색 및 필터 */}
-          <div className="card mb-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 mb-8 shadow-xl border border-white/20">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* 검색바 */}
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-400">🔍</span>
+                </div>
                 <input
                   type="text"
                   placeholder="위젯 검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 border-0 bg-white/50 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all duration-300 placeholder-gray-400"
                 />
               </div>
-              <div className="flex gap-2 overflow-x-auto">
+              
+              {/* 카테고리 필터 */}
+              <div className="flex gap-3 overflow-x-auto pb-2 lg:pb-0">
                 {categories.map(category => (
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-3 rounded-xl whitespace-nowrap transition-all duration-300 transform hover:scale-105 ${
                       selectedCategory === category.id
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        ? 'bg-blue-400/80 text-white shadow-lg border border-blue-300/30'
+                        : 'bg-white/50 text-gray-700 hover:bg-white hover:shadow-md'
                     }`}
                   >
-                    {category.icon} {category.name}
+                    <span className="text-lg">{category.icon}</span>
+                    <span className="font-medium">{category.name}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      selectedCategory === category.id 
+                        ? 'bg-white/20' 
+                        : 'bg-gray-100'
+                    }`}>
+                      {category.count}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -150,28 +231,57 @@ export default function WidgetStore() {
           </div>
 
           {/* 위젯 그리드 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredWidgets.map(widget => (
-              <div key={widget.id} className="card hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="text-3xl">{widget.icon}</div>
-                  {widget.isInstalled && (
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                      설치됨
-                    </span>
-                  )}
+              <div 
+                key={widget.id} 
+                                 className={`group relative bg-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl ${
+                   hoveredWidget === widget.id ? 'ring-2 ring-blue-400' : ''
+                 }`}
+                onMouseEnter={() => setHoveredWidget(widget.id)}
+                onMouseLeave={() => setHoveredWidget(null)}
+              >
+                {/* 설치 상태 배지 */}
+                {widget.isInstalled && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-lg">
+                    ✓ 설치됨
+                  </div>
+                )}
+
+                {/* 위젯 아이콘 */}
+                <div className={`w-16 h-16 bg-gradient-to-r ${widget.color} rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <span className="text-3xl">{widget.icon}</span>
                 </div>
                 
-                <h3 className="text-lg font-semibold mb-2">{widget.name}</h3>
-                <p className="text-gray-600 text-sm mb-4">{widget.description}</p>
+                {/* 위젯 정보 */}
+                                 <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors">
+                  {widget.name}
+                </h3>
+                <p className="text-gray-600 mb-4 leading-relaxed">
+                  {widget.description}
+                </p>
+
+                {/* 기능 목록 */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">주요 기능</h4>
+                  <div className="space-y-1">
+                    {widget.features.map((feature, index) => (
+                      <div key={index} className="flex items-center text-sm text-gray-600">
+                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></span>
+                        {feature}
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 
+                {/* 액션 버튼 */}
                 <button
                   onClick={() => toggleWidget(widget.id)}
-                  className={`w-full py-2 px-4 rounded-lg transition-colors ${
-                    widget.isInstalled
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'btn-primary'
-                  }`}
+                                     className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 backdrop-blur-sm ${
+                     widget.isInstalled
+                       ? 'bg-red-400/80 hover:bg-red-500/90 text-white shadow-lg border border-red-300/30'
+                       : 'bg-blue-400/80 hover:bg-blue-500/90 text-white shadow-lg border border-blue-300/30'
+                   }`}
                 >
                   {widget.isInstalled ? '제거하기' : '추가하기'}
                 </button>
@@ -179,31 +289,48 @@ export default function WidgetStore() {
             ))}
           </div>
 
-          {/* 설치된 위젯 관리 */}
-          <div className="card mt-8">
-            <h2 className="text-xl font-semibold mb-4">⚙️ 설치된 위젯 관리</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {widgets.filter(w => w.isInstalled).map(widget => (
-                <div key={widget.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{widget.icon}</span>
-                    <span className="font-medium">{widget.name}</span>
-                  </div>
-                  <button 
-                    onClick={() => toggleWidget(widget.id)}
-                    className="text-red-500 hover:text-red-700 text-sm"
-                  >
-                    제거
-                  </button>
-                </div>
-              ))}
-              {widgets.filter(w => w.isInstalled).length === 0 && (
-                <div className="col-span-full text-center text-gray-500 py-8">
-                  아직 추가된 위젯이 없습니다. 위에서 원하는 위젯을 추가해보세요!
-                </div>
-              )}
+          {/* 검색 결과가 없을 때 */}
+          {filteredWidgets.length === 0 && (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">🔍</div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">검색 결과가 없습니다</h3>
+              <p className="text-gray-600">다른 검색어나 카테고리를 시도해보세요</p>
             </div>
-          </div>
+          )}
+
+          {/* 설치된 위젯 관리 */}
+          {installedCount > 0 && (
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 mt-8 shadow-xl border border-white/20">
+              <div className="flex items-center gap-3 mb-6">
+                                 <div className="w-8 h-8 bg-green-400/80 rounded-lg flex items-center justify-center border border-green-300/30">
+                  <span className="text-white">⚙️</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-800">설치된 위젯 관리</h2>
+                <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full font-medium">
+                  {installedCount}개
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {widgets.filter(w => w.isInstalled).map(widget => (
+                  <div key={widget.id} className="flex items-center justify-between p-4 bg-white/50 rounded-xl hover:bg-white/70 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 bg-gradient-to-r ${widget.color} rounded-lg flex items-center justify-center`}>
+                        <span className="text-lg">{widget.icon}</span>
+                      </div>
+                      <span className="font-medium text-gray-800">{widget.name}</span>
+                    </div>
+                    <button 
+                      onClick={() => toggleWidget(widget.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                    >
+                      제거
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </>

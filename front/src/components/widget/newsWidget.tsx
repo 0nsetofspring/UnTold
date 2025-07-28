@@ -34,25 +34,35 @@ export default function NewsWidget() {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg h-48 flex items-center justify-center overflow-hidden">
+    <div className="bg-white rounded-lg flex flex-col items-start justify-start overflow-hidden p-2">
       {isLoading ? (
         <p className="text-gray-500">로딩 중...</p>
       ) : articles.length > 0 ? (
         <div className="space-y-3">
-          {articles.slice(0, 5).map((article, index) => ( // Show up to 5 articles
+          {articles.slice(0, 5).map((article, index) => (
             <a 
               key={index} 
               href={article.url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="block p-2 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <p className="text-sm font-medium text-gray-800 break-words">
-                {article.title}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {article.source.name}  
-              </p>
+              {article.urlToImage && (
+                <img
+                  src={article.urlToImage}
+                  alt="뉴스 썸네일"
+                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0 bg-gray-100"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 break-words line-clamp-2">
+                  {article.title}
+                </p>
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {article.source.name}  
+                </p>
+              </div>
             </a>
           ))}
         </div>

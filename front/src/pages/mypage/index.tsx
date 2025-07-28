@@ -5,7 +5,7 @@ export default function MyPage() {
   const [fontSize, setFontSize] = useState(16);
   // 샘플 스크랩/무드 데이터
   const scraps = [
-    { id: 1, title: '오늘의 명언', content: '작은 진전도 진전이다.' },
+    { id: 1, title: '명언', content: '작은 진전도 진전이다.' },
     { id: 2, title: '강아지 위젯', content: '귀여운 강아지 사진' },
   ];
   const moods = [

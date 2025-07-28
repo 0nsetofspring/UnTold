@@ -357,14 +357,14 @@ export default function WriteDiary() {
                           onDragStart={(e) => handleDragStart(e, {
                             id: 'quote-1',
                             type: 'widget',
-                            title: '오늘의 명언',
-                            content: '오늘의 명언\n"작은 진전도 진전이다"'
+                            title: '명언',
+                            content: '명언\n"작은 진전도 진전이다"'
                           })}
                         >
                           <div className="flex items-center space-x-2">
                             <span className="text-lg">💭</span>
                             <div>
-                              <p className="font-medium text-sm">오늘의 명언</p>
+                              <p className="font-medium text-sm">명언</p>
                               <p className="text-xs text-gray-600">"작은 진전도 진전이다"</p>
                             </div>
                           </div>

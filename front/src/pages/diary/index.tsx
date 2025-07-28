@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Navigation from '@/components/Navigation';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
+import fetchSentiment from './ml_kobert';
 
 type ValuePiece = Date | null;
 type Value = ValuePiece | [ValuePiece, ValuePiece];
@@ -11,6 +12,7 @@ interface DiaryEntry {
   date: string;
   mood: string;
   hasEntry: boolean;
+  content: string; // 추가
 }
 
 interface DraggedItem {
@@ -32,19 +34,19 @@ export default function WriteDiary() {
   
   // 샘플 일기 데이터 (실제로는 API에서 가져올 예정)
   const [diaries, setDiaries] = useState<DiaryEntry[]>([
-    { date: '2025-07-01', mood: '😊', hasEntry: true },
-    { date: '2025-07-03', mood: '😌', hasEntry: true },
-    { date: '2025-07-05', mood: '🤔', hasEntry: true },
-    { date: '2025-07-08', mood: '😊', hasEntry: true },
-    { date: '2025-07-10', mood: '😔', hasEntry: true },
-    { date: '2025-07-12', mood: '😌', hasEntry: true },
-    { date: '2025-07-15', mood: '😊', hasEntry: true },
-    { date: '2025-07-17', mood: '🤔', hasEntry: true },
-    { date: '2025-07-19', mood: '😌', hasEntry: true },
-    { date: '2025-07-22', mood: '😊', hasEntry: true },
-    { date: '2025-07-24', mood: '😔', hasEntry: true },
-    { date: '2025-07-26', mood: '😌', hasEntry: true },
-    { date: '2025-07-28', mood: '😊', hasEntry: true },
+    { date: '2025-07-01', mood: '😊', hasEntry: true, content: '오늘은 정말 바쁜 하루였다.' },
+    { date: '2025-07-03', mood: '😌', hasEntry: true, content: '점심에는 새로운 프로젝트에 대해 회의를 했는데...' },
+    { date: '2025-07-05', mood: '🤔', hasEntry: true, content: '저녁에는 집에서 조용히 시간을 보내며...' },
+    { date: '2025-07-08', mood: '😊', hasEntry: true, content: '전반적으로 만족스러운 하루였다.' },
+    { date: '2025-07-10', mood: '😔', hasEntry: true, content: '오늘은 조금 힘든 하루였다.' },
+    { date: '2025-07-12', mood: '😌', hasEntry: true, content: '그래도 좋은 일이 있었다.' },
+    { date: '2025-07-15', mood: '😊', hasEntry: true, content: '행복한 하루였다.' },
+    { date: '2025-07-17', mood: '🤔', hasEntry: true, content: '생각이 많은 하루였다.' },
+    { date: '2025-07-19', mood: '😌', hasEntry: true, content: '평온한 하루였다.' },
+    { date: '2025-07-22', mood: '😊', hasEntry: true, content: '기분 좋은 하루였다.' },
+    { date: '2025-07-24', mood: '😔', hasEntry: true, content: '조금 우울한 하루였다.' },
+    { date: '2025-07-26', mood: '😌', hasEntry: true, content: '마음이 편안했다.' },
+    { date: '2025-07-28', mood: '😊', hasEntry: true, content: '즐거운 하루였다.' },
   ]);
   
   // 오늘 날짜인지 확인하는 함수
@@ -58,18 +60,34 @@ export default function WriteDiary() {
     return diaries.find((d) => d.date === dateString);
   };
 
-  // 일기 저장 핸들러
-  const handleSaveDiary = (mood: string) => {
+  // 일기 저장 핸들러 (감정 분석 포함 - kobert)
+  const handleSaveDiary = async () => {
+    if (!diaryText) {
+        alert('일기 내용을 입력해주세요.');
+        return;
+    }
+
+    // 1. 감정 분석 API 호출
+    const sentimentResult = await fetchSentiment(diaryText);
+
+    // 2. 분석 결과에서 감정 라벨을 이모지로 변환
+    let moodEmoji = '😊'; // 기본값
+    if (sentimentResult) {
+        if (sentimentResult.label === 'positive') moodEmoji = '😊';
+        else if (sentimentResult.label === 'negative') moodEmoji = '😔';
+        else moodEmoji = '😐';
+    }
+
+    // 3. 기존 저장 로직 실행 (content도 저장)
     const dateString = selectedDate.toISOString().split('T')[0];
     setDiaries((prev) => {
-      // 이미 있으면 수정, 없으면 추가
       const exists = prev.some((d) => d.date === dateString);
       if (exists) {
         return prev.map((d) =>
-          d.date === dateString ? { ...d, mood, hasEntry: true } : d
+          d.date === dateString ? { ...d, mood: moodEmoji, hasEntry: true, content: diaryText } : d
         );
       } else {
-        return [...prev, { date: dateString, mood, hasEntry: true }];
+        return [...prev, { date: dateString, mood: moodEmoji, hasEntry: true, content: diaryText }];
       }
     });
     setViewMode('calendar');
@@ -284,13 +302,7 @@ export default function WriteDiary() {
                   
                   <div className="bg-gray-50 rounded-lg p-6 mb-6">
                     <p className="text-gray-800 leading-relaxed">
-                      오늘은 정말 바쁜 하루였다. 아침에 일어나서 대시보드를 확인했는데, 날씨가 맑아서 기분이 좋았다. 
-                      <br /><br />
-                      점심에는 새로운 프로젝트에 대해 회의를 했는데, 팀원들과 좋은 아이디어를 많이 나눌 수 있었다. 
-                      <br /><br />
-                      저녁에는 집에서 조용히 시간을 보내며 내일을 위한 계획을 세웠다. 
-                      <br /><br />
-                      전반적으로 만족스러운 하루였다.
+                      {getDiaryInfo(selectedDate)?.content || "일기 내용이 없습니다."}
                     </p>
                   </div>
                   
@@ -460,7 +472,7 @@ export default function WriteDiary() {
                         <div className="flex space-x-3">
                           <button
                             className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                            onClick={() => handleSaveDiary('😊')} // 임시로 '😊'로 저장, 실제로는 감정 선택값 사용
+                            onClick={handleSaveDiary}
                           >
                             💾 일기 저장
                           </button>

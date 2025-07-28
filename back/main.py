@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.widget.router import router as widget_router
+from api.ml_router import router as ml_router
 from dotenv import load_dotenv
 import os
 
@@ -24,7 +25,7 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(widget_router, prefix="/api")
-
+app.include_router(ml_router, prefix="/api")   
 @app.get("/")
 async def root():
     return {"message": "Welcome to Untold API"}

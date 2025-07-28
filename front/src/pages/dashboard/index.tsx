@@ -9,6 +9,10 @@ import AdviceWidget from '../../components/widget/adviceWidget';
 import BookWidget from '../../components/widget/bookWidget';
 import WeatherWidget from '../../components/widget/weatherWidget';
 import NewsWidget from '../../components/widget/newsWidget';
+import CatWidget from '../../components/widget/catWidget';
+import MusicWidget from '../../components/widget/musicWidget';
+import StockWidget from '../../components/widget/stockWidget';
+import NasaWidget from '../../components/widget/nasaWidget';
 
 interface Widget {
   id: string;
@@ -35,16 +39,28 @@ export default function Dashboard() {
   // 위젯 데이터
   const widgetData = {
     'random-dog': {
-      name: '오늘의 강아지',
+      name: '랜덤 강아지',
       icon: '🐶',
       component: RandomDogWidget,
       category: 'entertainment'
     },
+    'cat': {
+      name: '랜덤 고양이',
+      icon: '🐱',
+      component: CatWidget,
+      category: 'entertainment'
+    },
     'advice': {
-      name: '오늘의 명언',
+      name: '명언',
       icon: '💭',
       component: AdviceWidget,
       category: 'inspiration'
+    },
+    'music': {
+      name: '음악 추천',
+      icon: '🎵',
+      component: MusicWidget,
+      category: 'entertainment'
     },
     'book': {
       name: '주목할 만한 신간',
@@ -58,11 +74,23 @@ export default function Dashboard() {
       component: WeatherWidget,
       category: 'information'
     },
+    'stock': {
+      name: '오늘의 주식',
+      icon: '💹',
+      component: StockWidget,
+      category: 'information'
+    },
     'news': {
-      name: '오늘의 뉴스',
+      name: '오늘의 미국 뉴스',
       icon: '📰',
       component: NewsWidget,
       category: 'news'
+    },
+    'nasa': {
+      name: 'NASA 오늘의 우주',
+      icon: '🚀',
+      component: NasaWidget,
+      category: 'information'
     }
   };
 

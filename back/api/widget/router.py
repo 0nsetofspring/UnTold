@@ -11,12 +11,12 @@ router = APIRouter(
 
 @router.get("/randomDog")
 async def get_random_dog_widget_data():
-    """오늘의 강아지 위젯 데이터를 반환합니다."""
+    """랜덤 강아지 위젯 데이터를 반환합니다."""
     return await random_dog.get_random_dog_image()
 
 @router.get("/advice")
 async def get_advice_widget_data():
-    """오늘의 명언 위젯 데이터를 반환합니다."""
+    """명언 위젯 데이터를 반환합니다."""
     return await advice.get_random_advice()
 
 @router.get("/book")

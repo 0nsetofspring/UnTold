@@ -23,23 +23,43 @@ export default function WidgetStore() {
   const initialWidgets: Widget[] = [
     {
       id: 'random-dog',
-      name: '오늘의 강아지',
+      name: '랜덤 강아지',
       description: '매일 새로운 귀여운 강아지 사진으로 하루를 시작하세요',
       icon: '🐶',
       category: 'entertainment',
       isInstalled: false,
       color: 'from-rose-200 to-pink-300',
-      features: ['매일 새로운 강아지', '귀여움 충전', '즐거운 하루 시작']
+      features: ['랜덤한 새로운 강아지', '귀여움 충전', '즐거운 하루 시작']
+    },
+    {
+      id: 'cat',
+      name: '랜덤 고양이',
+      description: '랜덤 고양이 사진과 귀여운 한마디로 힐링하세요',
+      icon: '🐱',
+      category: 'entertainment',
+      isInstalled: false,
+      color: 'from-yellow-200 to-orange-200',
+      features: ['랜덤 고양이', '귀여운 한마디', '힐링']
     },
     {
       id: 'advice',
-      name: '오늘의 명언',
+      name: '명언',
       description: '영감을 주는 명언으로 하루의 동기부여를 받으세요',
       icon: '💭',
       category: 'information',
       isInstalled: false,
       color: 'from-blue-200 to-indigo-300',
-      features: ['매일 새로운 명언', '동기부여', '지혜로운 한마디']
+      features: ['한국어 명언', '동기부여', '지혜로운 한마디']
+    },
+    {
+      id: 'music',
+      name: '음악 추천',
+      description: '오늘의 분위기에 어울리는 음악을 추천해드려요',
+      icon: '🎵',
+      category: 'entertainment',
+      isInstalled: false,
+      color: 'from-pink-200 to-purple-200',
+      features: ['랜덤 음악', '유튜브 링크', '아티스트 정보']
     },
     {
       id: 'book',
@@ -62,15 +82,35 @@ export default function WidgetStore() {
       features: ['실시간 날씨', '체감온도', '일출/일몰 시간']
     },
     {
+      id: 'stock',
+      name: '오늘의 주식',
+      description: '주요 종목의 실시간 가격과 등락을 확인하세요',
+      icon: '💹',
+      category: 'information',
+      isInstalled: false,
+      color: 'from-lime-200 to-green-200',
+      features: ['주요 종목', '실시간 가격', '등락률 표시']
+    },
+    {
       id: 'news',
-      name: '오늘의 뉴스',
-      description: '최신 뉴스로 세상의 흐름을 파악하세요',
+      name: '오늘의 미국 뉴스',
+      description: '최신 미국 뉴스로 세상의 흐름을 파악하세요',
       icon: '📰',
       category: 'information',
       isInstalled: false,
       color: 'from-red-200 to-rose-300',
-      features: ['최신 뉴스', '다양한 카테고리', '실시간 업데이트']
-    }
+      features: ['최신 미국 동향 파악', '글로벌 뉴스', '실시간 업데이트']
+    },
+    {
+      id: 'nasa',
+      name: 'NASA 오늘의 우주',
+      description: '오늘의 우주 이미지와 정보를 감상하세요',
+      icon: '🚀',
+      category: 'information',
+      isInstalled: false,
+      color: 'from-blue-200 to-indigo-200',
+      features: ['NASA 이미지', '우주 정보', '링크 제공']
+    },
   ];
 
   const categories = [

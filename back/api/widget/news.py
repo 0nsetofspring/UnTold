@@ -10,7 +10,7 @@ async def get_news_data():
         return {"error": "뉴스 정보를 가져오는 데 실패했습니다. API 키가 설정되지 않았습니다."}
     
     params = {
-        "country": "kr",
+        "country": "us",
         "apiKey": NEWS_API_KEY,
         "pageSize": 5
     }

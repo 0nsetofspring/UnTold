@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { supabase } from '@/api/supabaseClient';
 
 export default function Home() {
   const [showLogin, setShowLogin] = useState(false);
@@ -24,10 +25,29 @@ export default function Home() {
     };
   }, []);
 
-  const handleLogin = () => {
-    // 로그인 버튼 클릭 시 메인 페이지로 이동
-    router.push('/dashboard');
+  // 카카오 로그인 처리 함수
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: {
+        scopes: 'profile_nickname',
+      }
+    });
+
+    if (error) {
+      console.error('카카오 로그인 에러:', error.message);
+    }
   };
+
+  // 사용자의 로그인 상태를 감지하는 useEffect
+  useEffect(() => {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        // 로그인이 감지되면 대시보드 페이지로 이동
+        router.push('/dashboard');
+      }
+    });
+  }, [router]);
 
   return (
     <>
@@ -61,7 +81,7 @@ export default function Home() {
               onClick={handleLogin}
               className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
-              🚀 로그인/회원가입 하기
+              🚀 카카오로 로그인/회원가입 하기
             </button>
           </div>
 

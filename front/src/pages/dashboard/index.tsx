@@ -3,6 +3,8 @@ import Head from 'next/head';
 import Navigation from '@/components/Navigation';
 import { useRouter } from 'next/router';
 import Masonry from 'react-masonry-css';
+import { supabase } from '@/api/supabaseClient'; // Supabase 클라이언트 import
+import axios from 'axios'; // API 호출을 위해 axios 사용
 
 import RandomDogWidget from '../../components/widget/randomdogWidget';
 import AdviceWidget from '../../components/widget/adviceWidget';
@@ -29,12 +31,28 @@ export default function Dashboard() {
 
   // localStorage에서 설치된 위젯 불러오기
   useEffect(() => {
-    const savedWidgets = localStorage.getItem('installedWidgets');
-    if (savedWidgets) {
-      const widgets = JSON.parse(savedWidgets);
-      setInstalledWidgets(widgets);
-    }
-  }, []);
+    const fetchUserWidgets = async () => {
+      // 1. 현재 로그인한 사용자 세션을 가져옵니다.
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session) {
+        // 2. 세션이 있으면, 백엔드 API를 호출하여 DB에서 위젯 목록을 가져옵니다.
+        try {
+          const response = await axios.get(`/api/widgets/user/${session.user.id}`);
+          // DB에서 widget_name만 추출하여 state에 저장합니다.
+          const fetchedWidgets = response.data.map((w: any) => w.widget_name);
+          setInstalledWidgets(fetchedWidgets);
+        } catch (error) {
+          console.error("사용자 위젯 정보를 불러오는데 실패했습니다:", error);
+        }
+      } else {
+        // 3. 세션이 없으면 로그인 페이지로 이동시킵니다.
+        router.push('/');
+      }
+    };
+
+    fetchUserWidgets();
+  }, [router]); // 의존성 배열에 router 추가
 
   // 위젯 데이터
   const widgetData = {

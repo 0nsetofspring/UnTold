@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.widget.router import router as widget_router
 from dotenv import load_dotenv
 import os
+# 크롬 익스텐션 API 라우터 추가
+from chrome_api.chrome_router import chrome_router
 
 # 환경변수 로드
 load_dotenv()
@@ -16,7 +18,9 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # 프론트엔드 주소
+    allow_origins=["http://localhost:3000",
+    "chrome-extension://*", 
+    ],  # 프론트엔드 주소, 크롬 익스텐션 (모든 익스텐션)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,6 +28,9 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(widget_router, prefix="/api")
+# 크롬 익스텐션 라우터 추가
+# - /api/log_url: 크롬 익스텐션에서 URL 로그를 받는 엔드포인트
+app.include_router(chrome_router, prefix="/api", tags=["chrome"])
 
 @app.get("/")
 async def root():

@@ -3,6 +3,7 @@ import torch
 import os
 from transformers import AutoTokenizer, AutoModel
 import numpy as np
+from huggingface_hub import hf_hub_download
 
 # EmotionRegressor 클래스 정의 (훈련 시 사용했던 것과 동일)
 class EmotionRegressor(torch.nn.Module):
@@ -27,6 +28,41 @@ class EmotionRegressor(torch.nn.Module):
             loss = loss_fct(logits, labels)
         return (loss, logits) if loss is not None else logits
 
+def download_model_from_hub():
+    """Hugging Face Hub에서 모델 다운로드"""
+    print("🤗 Hugging Face Hub에서 모델 다운로드 중...")
+    
+    REPO_ID = "kjy8402/untold-2d-emotion-model"
+    files_to_download = [
+        "model.safetensors",
+        "tokenizer.json", 
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "training_args.bin"
+    ]
+    
+    # 다운로드 디렉토리 생성
+    download_dir = "back/ml/best_emotion_regressor"
+    os.makedirs(download_dir, exist_ok=True)
+    
+    try:
+        for filename in files_to_download:
+            print(f"📥 다운로드 중: {filename}")
+            downloaded_path = hf_hub_download(
+                repo_id=REPO_ID,
+                filename=filename,
+                local_dir=download_dir,
+                local_dir_use_symlinks=False
+            )
+            print(f"✅ 완료: {filename}")
+        
+        print("🎉 모델 다운로드 완료!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 다운로드 실패: {e}")
+        return False
+
 # 모델과 토크나이저 로드 (한 번만 실행)
 print("2D 감정 분석 모델을 로드하는 중...")
 
@@ -37,8 +73,33 @@ base_model = AutoModel.from_pretrained(MODEL_NAME, trust_remote_code=True)
 
 # 훈련된 감정 회귀 모델 로드
 model = EmotionRegressor(base_model)
-# 올바른 모델 경로로 수정
-model_path = "/root/UnTold/back/back/ml/best_emotion_regressor"
+
+# 모델 경로 확인 및 다운로드
+model_paths = [
+    "/root/UnTold/back/back/ml/best_emotion_regressor",  # GPU 서버 경로
+    "back/ml/best_emotion_regressor",                   # 상대 경로
+    "./best_emotion_regressor"                          # 현재 디렉토리
+]
+
+model_loaded = False
+model_path = None
+
+# 기존 모델 경로들 시도
+for path in model_paths:
+    if os.path.exists(os.path.join(path, "model.safetensors")):
+        model_path = path
+        print(f"✅ 로컬 모델 발견: {model_path}")
+        break
+
+# 로컬에 모델이 없으면 Hugging Face에서 다운로드
+if not model_path:
+    print("⚠️  로컬에 모델이 없습니다.")
+    if download_model_from_hub():
+        model_path = "back/ml/best_emotion_regressor"
+    else:
+        raise FileNotFoundError("모델을 다운로드할 수 없습니다.")
+
+# 모델 가중치 로드
 try:
     # safetensors 대신 PyTorch 방식으로 로드 시도
     checkpoint = torch.load(f"{model_path}/pytorch_model.bin", map_location='cpu')
@@ -49,12 +110,12 @@ except FileNotFoundError:
         from safetensors.torch import load_file
         model_weights = load_file(f"{model_path}/model.safetensors")
         model.load_state_dict(model_weights)
-    except:
-        print(f"모델 로드 실패. 다음 경로를 확인해주세요: {model_path}")
+    except Exception as e:
+        print(f"❌ 모델 로드 실패: {e}")
         raise
-model.eval()
 
-print("모델 로드 완료!")
+model.eval()
+print("✅ 모델 로드 완료!")
 
 def get_emotion_label(valence, arousal):
     """

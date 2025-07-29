@@ -9,7 +9,7 @@ import json
 
 # 설정
 MODEL_NAME = "untold-2d-emotion-model"  # Hub에서 사용할 모델 이름
-REPO_ID = f"0nsetofspring/{MODEL_NAME}"  # 여기서 0nsetofspring을 본인 username으로 변경
+REPO_ID = f"kjy8402/{MODEL_NAME}"  # 실제 사용자명으로 변경
 LOCAL_MODEL_PATH = "back/ml/best_emotion_regressor"  # 파인튜닝된 모델 경로
 TEMP_UPLOAD_DIR = "temp_upload"
 

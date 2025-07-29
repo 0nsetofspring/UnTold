@@ -7,7 +7,7 @@ from typing import List
 import uuid
 
 from . import randomDog, advice, book, weather, news  
-from db.connect import supabase
+from db.db_utils import db_utils
 
 
 router = APIRouter(
@@ -52,11 +52,8 @@ class UserWidget(BaseModel):
 async def get_user_widgets(user_id: uuid.UUID):
     """특정 사용자가 설정한 위젯 목록과 순서를 DB에서 가져옵니다."""
     try:
-        response = supabase.table('user_widgets').select('*').eq('user_id', str(user_id)).order('position').execute()
-        
-        if response.data:
-            return response.data
-        return [] # 설정된 위젯이 없으면 빈 리스트 반환
+        widgets = db_utils.get_user_widgets(str(user_id))
+        return widgets
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -64,29 +61,22 @@ async def get_user_widgets(user_id: uuid.UUID):
 async def set_user_widgets(user_id: uuid.UUID, widgets: List[UserWidget]):
     """사용자의 위젯 설정을 DB에 저장(업데이트)합니다."""
     try:
-        # 1. 기존 위젯 설정을 모두 삭제합니다.
-        supabase.table('user_widgets').delete().eq('user_id', str(user_id)).execute()
-
-        # 2. 새로운 위젯 설정 목록을 한 번에 추가합니다.
-        records_to_insert = [
-            {
-                "id": str(uuid.uuid4()), # 새 UUID 생성
-                "user_id": str(user_id),
-                "widget_name": w.widget_name,
-                "position": w.position
-            } for w in widgets
-        ]
+        # 기존 위젯들을 모두 제거
+        existing_widgets = db_utils.get_user_widgets(str(user_id))
+        for widget in existing_widgets:
+            db_utils.remove_user_widget(str(user_id), widget["widget_name"])
         
-        if not records_to_insert:
-             return {"message": "User widgets cleared successfully."}
-
-        response = supabase.table('user_widgets').insert(records_to_insert).execute()
-
-        if response.data:
-            return response.data
-        else:
-            # Supabase v2부터는 insert 성공 시 error가 None이지만 data가 비어있을 수 있습니다.
-            return {"message": "User widgets updated successfully."}
+        # 새로운 위젯들을 추가
+        success_count = 0
+        for widget in widgets:
+            widget_config = {"position": widget.position}
+            if db_utils.add_user_widget(str(user_id), widget.widget_name, widget_config):
+                success_count += 1
+        
+        return {
+            "message": f"User widgets updated successfully. {success_count} widgets saved.",
+            "saved_count": success_count
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

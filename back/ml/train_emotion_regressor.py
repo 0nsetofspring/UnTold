@@ -1,22 +1,46 @@
 # back/ml/train_emotion_regressor.py
+import os
 import torch
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModel, TrainingArguments, Trainer
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
 
+# 환경 변수 설정 (HuggingFace Hub 접속 문제 해결)
+os.environ['TRANSFORMERS_CACHE'] = os.path.expanduser('~/.cache/huggingface/transformers')
+os.environ['HF_DATASETS_CACHE'] = os.path.expanduser('~/.cache/huggingface/datasets')
+os.environ['HF_HOME'] = os.path.expanduser('~/.cache/huggingface')
+
 # 1. 모델과 토크나이저 로드
 MODEL_NAME = "intfloat/multilingual-e5-large-instruct"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-base_model = AutoModel.from_pretrained(MODEL_NAME)
+
+print(f"모델 다운로드 시작: {MODEL_NAME}")
+try:
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    base_model = AutoModel.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    print("모델 로드 성공!")
+except Exception as e:
+    print(f"원래 모델 로드 실패: {e}")
+    print("대안 모델로 변경합니다...")
+    MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    base_model = AutoModel.from_pretrained(MODEL_NAME)
+    print(f"대안 모델 로드 성공: {MODEL_NAME}")
+
+# 모델 저장 경로 생성
+model_save_path = f"back/ml/{MODEL_NAME.replace('/', '_')}"
+os.makedirs(model_save_path, exist_ok=True)
+base_model.save_pretrained(model_save_path)
 
 # 2. 러셀 모델을 위한 커스텀 모델 정의 (Regression Head)
 class EmotionRegressor(torch.nn.Module):
     def __init__(self, base_model):
         super().__init__()
         self.encoder = base_model
+        # 모델의 hidden size를 동적으로 가져옴
+        hidden_size = base_model.config.hidden_size
         self.regressor = torch.nn.Sequential(
-            torch.nn.Linear(1024, 2), # 출력: [valence, arousal] 2개
+            torch.nn.Linear(hidden_size, 2), # 출력: [valence, arousal] 2개
             torch.nn.Tanh()      # 결과를 -1 ~ 1 사이로 제한
         )
     def forward(self, input_ids, attention_mask, labels=None):
@@ -37,7 +61,13 @@ def preprocess_function(examples):
     tokenized_inputs["labels"] = [[v, a] for v, a in zip(examples["valence"], examples["arousal"])]
     return tokenized_inputs
 
-dataset = load_dataset("csv", data_files={"train": "back/ml/kote_regression_train.csv", "validation": "back/ml/kote_regression_validation.csv"})
+dataset = load_dataset(
+    "csv",
+    data_files={
+        "train": "ml/kote_regression_train.csv",
+        "validation": "ml/kote_regression_validation.csv"
+    }
+)
 tokenized_dataset = dataset.map(preprocess_function, batched=True, remove_columns=["text", "valence", "arousal"])
 
 # 4. 평가 지표 정의 (회귀용)
@@ -53,7 +83,7 @@ training_args = TrainingArguments(
     num_train_epochs=3,
     per_device_train_batch_size=16,
     learning_rate=2e-5,
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",  # evaluation_strategy -> eval_strategy로 변경
     save_strategy="epoch",
     load_best_model_at_end=True,
 )

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.widget.router import router as widget_router
+from api.ml_router import router as ml_router
 from dotenv import load_dotenv
 import os
 # 크롬 익스텐션 API 라우터 추가
@@ -28,6 +29,8 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(widget_router, prefix="/api")
+app.include_router(ml_router, prefix="/api")   
+
 # 크롬 익스텐션 라우터 추가
 # - /api/log_url: 크롬 익스텐션에서 URL 로그를 받는 엔드포인트
 app.include_router(chrome_router, prefix="/api", tags=["chrome"])

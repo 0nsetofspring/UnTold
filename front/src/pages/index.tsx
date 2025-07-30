@@ -26,7 +26,7 @@ export default function Home() {
   }, []);
 
   // 카카오 로그인 처리 함수
-  const handleLogin = async () => {
+  const handleKakaoLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
       options: {
@@ -36,6 +36,34 @@ export default function Home() {
 
     if (error) {
       console.error('카카오 로그인 에러:', error.message);
+    }
+  };
+
+  // Google 로그인 처리 함수
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        scopes: 'email profile',
+      }
+    });
+
+    if (error) {
+      console.error('Google 로그인 에러:', error.message);
+    }
+  };
+
+  // GitHub 로그인 처리 함수
+  const handleGitHubLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        scopes: 'read:user user:email',
+      }
+    });
+
+    if (error) {
+      console.error('GitHub 로그인 에러:', error.message);
     }
   };
 
@@ -69,7 +97,7 @@ export default function Home() {
             나도 몰랐던 나를 아는 방법
           </div>
 
-          {/* 로그인 버튼 */}
+          {/* 로그인 버튼들 */}
           <div 
             className={`transition-all duration-1000 ease-in-out transform ${
               showLogin 
@@ -77,12 +105,34 @@ export default function Home() {
                 : 'opacity-0 translate-y-8'
             }`}
           >
-            <button
-              onClick={handleLogin}
-              className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-            >
-              🚀 카카오로 로그인/회원가입 하기
-            </button>
+            <div className="space-y-4">
+              {/* 카카오 로그인 버튼 */}
+              <button
+                onClick={handleKakaoLogin}
+                className="w-full bg-gradient-to-r from-yellow-300 to-yellow-400 hover:from-yellow-200 hover:to-yellow-300 text-black font-semibold py-3 px-6 rounded-lg text-base shadow-xl hover:shadow-2xl transition-all duration-300 transform scale-105 hover:scale-110 flex items-center justify-center backdrop-blur-sm bg-opacity-90 border border-yellow-200/50"
+              >
+                <span className="mr-2">📱</span>
+                카카오로 로그인/회원가입
+              </button>
+              
+              {/* Google 로그인 버튼 */}
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-300 hover:to-blue-400 text-white font-semibold py-3 px-6 rounded-lg text-base shadow-xl hover:shadow-2xl transition-all duration-300 transform scale-105 hover:scale-110 flex items-center justify-center backdrop-blur-sm bg-opacity-90 border border-blue-200/50"
+              >
+                <span className="mr-2">🔍</span>
+                Google로 로그인/회원가입
+              </button>
+              
+              {/* GitHub 로그인 버튼 */}
+              <button
+                onClick={handleGitHubLogin}
+                className="w-full bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-semibold py-3 px-6 rounded-lg text-base shadow-xl hover:shadow-2xl transition-all duration-300 transform scale-105 hover:scale-110 flex items-center justify-center backdrop-blur-sm bg-opacity-90 border border-gray-500/50"
+              >
+                <span className="mr-2">🐙</span>
+                GitHub로 로그인/회원가입
+              </button>
+            </div>
           </div>
 
           {/* 추가 설명 */}

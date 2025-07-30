@@ -519,23 +519,29 @@ export default function WriteDiary() {
       return;
     }
 
-    // 감정 분석 API 호출
+    // 2D 감정 분석 API 호출
     const sentimentResult = await fetchSentiment(diaryText);
 
-    // 랜덤 감정 벡터 생성
-    const randomValence = (Math.random() - 0.5) * 2;
-    const randomArousal = (Math.random() - 0.5) * 2;
-    const moodVector = [randomValence, randomArousal];
-
-    let finalMoodVector = moodVector;
+    // 2D 감정 분석 결과 처리
+    let finalMoodVector = [0, 0]; // 기본값
+    
     if (sentimentResult) {
-      if (sentimentResult.label === 'positive') {
-        finalMoodVector = [0.5 + Math.random() * 0.5, -0.5 + Math.random() * 1];
-      } else if (sentimentResult.label === 'negative') {
-        finalMoodVector = [-0.5 - Math.random() * 0.5, -0.5 + Math.random() * 1];
-      } else {
-        finalMoodVector = [-0.2 + Math.random() * 0.4, -0.2 + Math.random() * 0.4];
-      }
+      // 2D 감정 분석 모델의 실제 결과 사용
+      const valence = sentimentResult.valence || 0;
+      const arousal = sentimentResult.arousal || 0;
+      const emotionLabel = sentimentResult.emotion_label || 'neutral';
+      
+      // mood_vector에 실제 2D 좌표값 저장
+      finalMoodVector = [valence, arousal];
+      
+      console.log('🎭 2D 감정 분석 결과:', {
+        valence,
+        arousal,
+        emotionLabel,
+        finalMoodVector
+      });
+    } else {
+      console.log('⚠️ 감정 분석 결과가 없습니다.');
     }
 
     // 레이아웃 차이 기반 보상 계산

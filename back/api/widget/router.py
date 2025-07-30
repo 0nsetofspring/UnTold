@@ -108,3 +108,39 @@ async def check_scrap_endpoint(user_id: str, source_type: str, category: str, co
     """스크랩 상태를 확인합니다."""
     exists = await check_scrap_exists(user_id, source_type, category, content)
     return {"exists": exists}
+
+@router.get("/scrap/list/{user_id}")
+async def get_user_scraps(user_id: str, date: str = None):
+    """사용자의 스크랩 목록을 가져옵니다."""
+    try:
+        print(f"🔍 스크랩 조회 요청: user_id={user_id}, date={date}")
+        
+        query = supabase.table('scraps').select('*').eq('user_id', user_id)
+        
+        # 날짜 필터링이 있는 경우
+        if date:
+            # 날짜 범위 설정 (해당 날짜의 00:00:00 ~ 23:59:59)
+            from datetime import datetime, timedelta
+            start_date = datetime.strptime(date, '%Y-%m-%d')
+            end_date = start_date + timedelta(days=1)
+            
+            print(f"📅 날짜 필터링: {start_date.isoformat()} ~ {end_date.isoformat()}")
+            print(f"📅 요청된 날짜: {date}")
+            print(f"📅 시작 시간: {start_date.isoformat()}")
+            print(f"📅 종료 시간: {end_date.isoformat()}")
+            
+            query = query.gte('scraped_at', start_date.isoformat())
+            query = query.lt('scraped_at', end_date.isoformat())
+        else:
+            print("📅 날짜 필터링 없음 - 모든 스크랩 조회")
+        
+        response = query.order('scraped_at', desc=True).execute()
+        
+        print(f"📊 조회 결과: {len(response.data) if response.data else 0}개 스크랩")
+        
+        if response.data:
+            return response.data
+        return []
+    except Exception as e:
+        print(f"❌ 스크랩 조회 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

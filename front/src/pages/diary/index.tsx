@@ -43,6 +43,7 @@ export default function WriteDiary() {
   const [imageCards, setImageCards] = useState<DraggedItem[]>([]);
   const [aiSuggestedLayout, setAiSuggestedLayout] = useState<any>(null);
   const [layoutApplied, setLayoutApplied] = useState(false);
+  const [scrapItems, setScrapItems] = useState<DraggedItem[]>([]);
   const today = new Date();
   
   // 샘플 일기 데이터 (실제로는 API에서 가져올 예정)
@@ -70,10 +71,13 @@ export default function WriteDiary() {
         return;
       }
   
-      const userId = userData.user.id;
-      const selectedDateString = selectedDate.toISOString().split('T')[0];
-  
-      // 날짜 필터링을 위해 UTC 기준으로 조정
+            const userId = userData.user.id;
+      
+      // 한국 시간대로 날짜 처리
+      const koreaTime = new Date(selectedDate.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+      const selectedDateString = koreaTime.toISOString().split('T')[0];
+
+      // 날짜 필터링을 위해 한국 시간 기준으로 조정
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
@@ -123,8 +127,96 @@ export default function WriteDiary() {
         setChromeLogs(formatted);
       }
     };
+
+    const fetchScrapItems = async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        console.error('사용자 정보를 가져올 수 없습니다.', userError);
+        return;
+      }
+
+      const userId = userData.user.id;
+      
+      // 한국 시간대로 날짜 처리
+      const koreaTime = new Date(selectedDate.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+      const selectedDateString = koreaTime.toISOString().split('T')[0];
+
+      console.log('📅 날짜 처리:', {
+        selectedDate: selectedDate,
+        selectedDateString: selectedDateString,
+        selectedDateISO: selectedDate.toISOString(),
+        koreaTimeISO: koreaTime.toISOString(),
+        selectedDateLocal: selectedDate.toLocaleDateString('ko-KR')
+      });
+
+      try {
+        // 날짜 필터링과 함께 스크랩 데이터 가져오기
+        const response = await fetch(`/api/widgets/scrap/list/${userId}?date=${selectedDateString}`);
+        if (!response.ok) {
+          console.error('스크랩 데이터를 가져오는 데 실패했습니다.');
+          return;
+        }
+
+        const scrapData = await response.json();
+        console.log('📌 스크랩 데이터 조회 결과:', {
+          selectedDate: selectedDateString,
+          userId: userId,
+          scrapData: scrapData,
+          count: scrapData?.length || 0
+        });
+
+        if (scrapData && Array.isArray(scrapData)) {
+          const formatted: DraggedItem[] = scrapData.map((scrap: any) => {
+            // 카테고리별 아이콘 설정
+            let icon = '📌';
+            switch (scrap.category) {
+              case 'weather':
+                icon = '🌤️';
+                break;
+              case 'advice':
+                icon = '💭';
+                break;
+              case 'book':
+                icon = '📚';
+                break;
+              case 'news':
+                icon = '📰';
+                break;
+              case 'randomdog':
+                icon = '🐕';
+                break;
+              case 'cat':
+                icon = '🐱';
+                break;
+              case 'music':
+                icon = '🎵';
+                break;
+              case 'stock':
+                icon = '📈';
+                break;
+              case 'nasa':
+                icon = '🚀';
+                break;
+              default:
+                icon = '📌';
+            }
+
+            return {
+              id: `scrap-${scrap.id}`,
+              type: 'widget',
+              title: `${icon} ${scrap.category} 스크랩`,
+              content: scrap.content || '스크랩된 내용',
+            };
+          });
+          setScrapItems(formatted);
+        }
+      } catch (error) {
+        console.error('스크랩 데이터 불러오기 실패:', error);
+      }
+    };
   
     fetchChromeLogs();
+    fetchScrapItems();
   }, [selectedDate]);
   
   // 오늘 날짜인지 확인하는 함수
@@ -750,60 +842,39 @@ export default function WriteDiary() {
                     <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
                       <h3 className="text-xl font-semibold mb-4">📌 위젯 스크랩</h3>
                       <div className="space-y-3">
-                        <div 
-                          className="bg-blue-50 p-3 rounded-lg border border-blue-200 cursor-move hover:bg-blue-100 transition-colors"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, {
-                            id: 'weather-1',
-                            type: 'widget',
-                            title: '오늘 날씨',
-                            content: '오늘 날씨: 맑음, 26°C\n체감온도 27°C, 습도 90%'
-                          })}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">🌤️</span>
-                            <div>
-                              <p className="font-medium text-sm">오늘 날씨: 맑음, 26°C</p>
-                              <p className="text-xs text-gray-600">체감온도 27°C, 습도 90%</p>
+                        {scrapItems.length > 0 ? (
+                          scrapItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="bg-blue-50 p-3 rounded-lg border border-blue-200 cursor-move hover:bg-blue-100 transition-colors"
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, item)}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg">{item.title.split(' ')[0]}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate" title={item.title}>
+                                    {item.title}
+                                  </p>
+                                  <p className="text-xs text-gray-600 truncate" title={item.content}>
+                                    {item.content}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-gray-500 text-sm">
+                              {selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] 
+                                ? '오늘 스크랩한 위젯이 없습니다.' 
+                                : `${selectedDate.toLocaleDateString('ko-KR')}에 스크랩한 위젯이 없습니다.`}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              대시보드에서 위젯을 스크랩하면 여기에 표시됩니다.
+                            </p>
                           </div>
-                        </div>
-                        <div 
-                          className="bg-green-50 p-3 rounded-lg border border-green-200 cursor-move hover:bg-green-100 transition-colors"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, {
-                            id: 'book-1',
-                            type: 'widget',
-                            title: '새로 읽은 책',
-                            content: '새로 읽은 책: "눈 맞추는 소설"\n개와 고양이와 새와 그리고'
-                          })}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">📚</span>
-                            <div>
-                              <p className="font-medium text-sm">새로 읽은 책: "눈 맞추는 소설"</p>
-                              <p className="text-xs text-gray-600">개와 고양이와 새와 그리고</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div 
-                          className="bg-purple-50 p-3 rounded-lg border border-purple-200 cursor-move hover:bg-purple-100 transition-colors"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, {
-                            id: 'quote-1',
-                            type: 'widget',
-                            title: '명언',
-                            content: '명언\n"작은 진전도 진전이다"'
-                          })}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">💭</span>
-                            <div>
-                              <p className="font-medium text-sm">명언</p>
-                              <p className="text-xs text-gray-600">"작은 진전도 진전이다"</p>
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 

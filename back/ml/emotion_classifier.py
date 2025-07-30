@@ -76,8 +76,8 @@ model = EmotionRegressor(base_model)
 
 # 모델 경로 확인 및 다운로드
 model_paths = [
-    "/root/UnTold/back/back/ml/best_emotion_regressor",  # GPU 서버 경로
-    "back/ml/best_emotion_regressor",                   # 상대 경로
+    "/root/UnTold/back/ml/best_emotion_regressor",  # GPU 서버 경로
+    "ml/best_emotion_regressor",                   # 상대 경로
     "./best_emotion_regressor"                          # 현재 디렉토리
 ]
 
@@ -95,7 +95,7 @@ for path in model_paths:
 if not model_path:
     print("⚠️  로컬에 모델이 없습니다.")
     if download_model_from_hub():
-        model_path = "back/ml/best_emotion_regressor"
+        model_path = "ml/best_emotion_regressor"
     else:
         raise FileNotFoundError("모델을 다운로드할 수 없습니다.")
 

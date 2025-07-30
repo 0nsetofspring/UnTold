@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '../../api/axiosInstance';
+import { useScrap } from '@/hooks/useScrap';
 
 // API 응답 데이터 타입을 새로운 형식에 맞게 수정
 interface AdviceData {
@@ -12,6 +13,10 @@ interface AdviceData {
 export default function AdviceWidget() {
   const [advice, setAdvice] = useState<AdviceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 스크랩 기능 추가
+  const scrapContent = advice ? `"${advice.message}" - ${advice.author}` : '';
+  const { isScrapped, isLoading: scrapLoading, toggleScrap } = useScrap('widget', 'advice', scrapContent);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,6 +39,21 @@ export default function AdviceWidget() {
         <p className="text-gray-500">명언을 불러오는 중...</p>
       ) : advice ? (
         <div>
+          {/* 스크랩 버튼 */}
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={toggleScrap}
+              disabled={scrapLoading}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                isScrapped 
+                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                  : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+              } ${scrapLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              {scrapLoading ? '처리중...' : isScrapped ? '스크랩됨' : '스크랩하기'}
+            </button>
+          </div>
+
           {/* content를 message로 변경 */}
           <blockquote className="italic text-gray-700 mb-3">
             "{advice.message}"

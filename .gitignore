@@ -146,4 +146,5 @@ jspm_packages/
 .dynamodb/
 
 # TernJS port file
-.tern-port 
+.tern-port back/back/
+back/back/ml/best_emotion_regressor/

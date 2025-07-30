@@ -42,7 +42,7 @@ def download_model_from_hub():
     ]
     
     # 다운로드 디렉토리 생성
-    download_dir = "back/ml/best_emotion_regressor"
+    download_dir = "ml/best_emotion_regressor"
     os.makedirs(download_dir, exist_ok=True)
     
     try:

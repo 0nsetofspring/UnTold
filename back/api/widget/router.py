@@ -7,6 +7,7 @@ from typing import List
 import uuid
 
 from . import randomDog, advice, book, weather, news  
+from .scrap import ScrapData, create_scrap, delete_scrap, check_scrap_exists
 from db.connect import supabase
 
 
@@ -90,3 +91,20 @@ async def set_user_widgets(user_id: uuid.UUID, widgets: List[UserWidget]):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- 스크랩 관련 API ---
+@router.post("/scrap")
+async def create_scrap_endpoint(scrap_data: ScrapData):
+    """위젯을 스크랩합니다."""
+    return await create_scrap(scrap_data)
+
+@router.delete("/scrap")
+async def delete_scrap_endpoint(user_id: str, source_type: str, category: str, content: str):
+    """스크랩을 취소합니다."""
+    return await delete_scrap(user_id, source_type, category, content)
+
+@router.get("/scrap/check")
+async def check_scrap_endpoint(user_id: str, source_type: str, category: str, content: str):
+    """스크랩 상태를 확인합니다."""
+    exists = await check_scrap_exists(user_id, source_type, category, content)
+    return {"exists": exists}

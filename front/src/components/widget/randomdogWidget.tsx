@@ -35,10 +35,10 @@ export default function RandomDogWidget() {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg h-48 flex items-center justify-center overflow-hidden relative">
-      {/* 스크랩 버튼 */}
+    <div className="bg-white rounded-lg h-48 flex flex-col">
+      {/* 스크랩 버튼 - 상단에 별도 영역 */}
       {!isLoading && dogImageUrl && (
-        <div className="absolute top-2 right-2 z-10">
+        <div className="flex justify-end p-2">
           <button
             onClick={toggleScrap}
             disabled={scrapLoading}
@@ -53,17 +53,20 @@ export default function RandomDogWidget() {
         </div>
       )}
 
-      {isLoading ? (
-        <div className="text-gray-500">🐕</div>
-      ) : dogImageUrl ? (
-        <img 
-          src={dogImageUrl} 
-          alt="Random Dog" 
-          className="w-full h-full object-contain" 
-        />
-      ) : (
-        <div className="text-gray-500">🐕</div>
-      )}
+      {/* 이미지 영역 */}
+      <div className="flex-1 flex items-center justify-center overflow-hidden">
+        {isLoading ? (
+          <div className="text-gray-500">🐕</div>
+        ) : dogImageUrl ? (
+          <img 
+            src={dogImageUrl} 
+            alt="Random Dog" 
+            className="w-full h-full object-contain" 
+          />
+        ) : (
+          <div className="text-gray-500">🐕</div>
+        )}
+      </div>
     </div>
   );
 }

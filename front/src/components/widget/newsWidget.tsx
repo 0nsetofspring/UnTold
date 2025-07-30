@@ -41,7 +41,7 @@ export default function NewsWidget() {
 
   return (
     <div className="bg-white rounded-lg flex flex-col items-start justify-start overflow-hidden p-2">
-      {/* 스크랩 버튼 */}
+      {/* 스크랩 버튼 - 상단에 별도 영역 */}
       {!isLoading && articles.length > 0 && (
         <div className="flex justify-end mb-2">
           <button

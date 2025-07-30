@@ -989,16 +989,13 @@ export default function WriteDiary() {
                               draggable
                               onDragStart={(e) => handleDragStart(e, item)}
                             >
-                              <div className="flex items-center space-x-2">
-                                <span className="text-lg">{item.title.split(' ')[0]}</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate" title={item.title}>
-                                    {item.title}
-                                  </p>
-                                  <p className="text-xs text-gray-600 truncate" title={item.content}>
-                                    {item.content}
-                                  </p>
-                                </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm break-words" title={item.title}>
+                                  {item.title}
+                                </p>
+                                <p className="text-xs text-gray-600 break-words mt-1" title={item.content}>
+                                  {item.content}
+                                </p>
                               </div>
                             </div>
                           ))

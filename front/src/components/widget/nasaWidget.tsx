@@ -1,4 +1,5 @@
 import React from 'react';
+import { useScrap } from '@/hooks/useScrap';
 
 const nasaData = [
   {
@@ -32,8 +33,29 @@ export default function NasaWidget() {
   // 3개 랜덤 추출
   const shuffled = [...nasaData].sort(() => 0.5 - Math.random());
   const showList = shuffled.slice(0, 3);
+  
+  // 스크랩 기능 추가
+  const scrapContent = showList.length > 0 ? 
+    `${showList[0].title} - ${showList[0].desc}` : '';
+  const { isScrapped, isLoading: scrapLoading, toggleScrap } = useScrap('widget', 'nasa', scrapContent);
+
   return (
     <div className="bg-white rounded-lg p-4">
+      {/* 스크랩 버튼 */}
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={toggleScrap}
+          disabled={scrapLoading}
+          className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+            isScrapped 
+              ? 'bg-green-100 text-green-700 border border-green-200' 
+              : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+          } ${scrapLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          {scrapLoading ? '처리중...' : isScrapped ? '스크랩됨' : '스크랩하기'}
+        </button>
+      </div>
+
       <div className="space-y-2">
         {showList.map((data, idx) => (
           <div key={data.title} className="flex items-center gap-2">

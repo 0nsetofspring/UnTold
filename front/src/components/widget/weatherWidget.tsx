@@ -2,6 +2,7 @@
 
 import axiosInstance from '@/api/axiosInstance';
 import React, { useState, useEffect } from 'react';
+import { useScrap } from '@/hooks/useScrap';
 
 interface WeatherData {
   name: string;
@@ -29,6 +30,12 @@ interface WeatherData {
 export default function WeatherWidget() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 스크랩 기능 추가
+  const scrapContent = weatherData ? 
+    `${weatherData.name}: ${weatherData.weather[0]?.description}, ${Math.round(weatherData.main.temp)}°C` : 
+    '';
+  const { isScrapped, isLoading: scrapLoading, toggleScrap } = useScrap('widget', 'weather', scrapContent);
 
   useEffect(() => {
     const fetchWeatherData = async () => {
@@ -98,6 +105,21 @@ export default function WeatherWidget() {
 
   return (
     <div className="space-y-4">
+      {/* 스크랩 버튼 */}
+      <div className="flex justify-end">
+        <button
+          onClick={toggleScrap}
+          disabled={scrapLoading || !weatherData}
+          className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+            isScrapped 
+              ? 'bg-green-100 text-green-700 border border-green-200' 
+              : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+          } ${scrapLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          {scrapLoading ? '처리중...' : isScrapped ? '스크랩됨' : '스크랩하기'}
+        </button>
+      </div>
+
       {/* 메인 날씨 정보 */}
       <div className="text-center">
         <div className="flex items-center justify-center space-x-3 mb-2">

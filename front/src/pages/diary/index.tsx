@@ -659,7 +659,8 @@ export default function WriteDiary() {
     }
 
     alert('일기가 생성되었습니다!');
-    router.push('/diary/calendar');
+    // 일기 보기 페이지로 이동
+    router.push(`/diary/view?date=${selectedDate.toISOString().split('T')[0]}`);
   };
 
   return (

@@ -77,7 +77,14 @@ export default function DiaryCalendar() {
   // 날짜 클릭 핸들러
   const handleDateClick = (date: Date) => {
     const dateString = date.toISOString().split('T')[0];
-    router.push(`/diary?date=${dateString}`);
+    const diary = getDiaryForDate(date);
+    
+    // 이미 완성된 일기가 있으면 보기 페이지로, 없으면 작성 페이지로
+    if (diary && diary.status === 'finalized') {
+      router.push(`/diary/view?date=${dateString}`);
+    } else {
+      router.push(`/diary?date=${dateString}`);
+    }
   };
 
   // 이전/다음 월 이동
@@ -268,4 +275,4 @@ export default function DiaryCalendar() {
       </main>
     </>
   );
-} 
+}   

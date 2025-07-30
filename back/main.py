@@ -1,9 +1,13 @@
+import os
+# PYTHONIOENCODING 환경 변수를 UTF-8로 설정하여 인코딩 문제를 방지합니다.
+# 이 설정은 파일 입출력 및 다른 라이브러리의 문자열 처리에 영향을 미칠 수 있습니다.
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.widget.router import router as widget_router
 from api.ml_router import router as ml_router
 from dotenv import load_dotenv
-import os
 # 크롬 익스텐션 API 라우터 추가
 from chrome_api.chrome_router import chrome_router
 
@@ -20,7 +24,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000",
-    "chrome-extension://*", 
+    "chrome-extension://*",
     ],  # 프론트엔드 주소, 크롬 익스텐션 (모든 익스텐션)
     allow_credentials=True,
     allow_methods=["*"],
@@ -29,7 +33,7 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(widget_router, prefix="/api")
-app.include_router(ml_router, prefix="/api")   
+app.include_router(ml_router, prefix="/api")
 
 # 크롬 익스텐션 라우터 추가
 # - /api/log_url: 크롬 익스텐션에서 URL 로그를 받는 엔드포인트
@@ -54,4 +58,4 @@ async def debug_env():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)

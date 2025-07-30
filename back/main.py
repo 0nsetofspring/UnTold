@@ -9,7 +9,7 @@ from api.widget.router import router as widget_router
 from api.ml_router import router as ml_router
 from dotenv import load_dotenv
 # 크롬 익스텐션 API 라우터 추가
-from chrome_api.chrome_router import chrome_router
+from chrome.chrome_api.chrome_router import chrome_router
 
 # 환경변수 로드
 load_dotenv()

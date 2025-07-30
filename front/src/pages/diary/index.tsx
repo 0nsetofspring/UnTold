@@ -1,27 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Navigation from '@/components/Navigation';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
 import fetchSentiment from './ml_kobert';
-import { supabase } from '@/api/supabaseClient'; 
-
-type ValuePiece = Date | null;
-type Value = ValuePiece | [ValuePiece, ValuePiece];
+import { supabase } from '@/api/supabaseClient';
+import { useRouter } from 'next/router';
 
 interface DiaryEntry {
   date: string;
   mood: string;
   hasEntry: boolean;
-  content: string; // 추가
+  content: string;
 }
  
 interface DraggedItem {
   id: string;
-  type: 'widget' | 'chrome' | 'custom';
+  type: 'chrome' | 'custom';
   content: string;
   title: string;
-  imageUrl?: string; // 사진 카드용 이미지 URL (선택적)
+  imageUrl?: string;
 }
 
 interface CustomImage {
@@ -31,89 +27,158 @@ interface CustomImage {
   previewUrl: string;
 }
 
+interface Card {
+  id: string;
+  diary_id: string;
+  source_type: string;
+  category: string;
+  content: string;
+  image_url?: string;
+  layout_type: string;
+  row?: number;
+  col?: number;
+  order_index?: number;
+  text_generated: boolean;
+  text_final: string;
+  created_at: string;
+}
+
 export default function WriteDiary() {
-  const [mounted, setMounted] = useState(false);
-  const [viewMode, setViewMode] = useState<'calendar' | 'write' | 'read'>('calendar');
+
+  const router = useRouter();
+=======
+
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [diaryText, setDiaryText] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [draggedItems, setDraggedItems] = useState<DraggedItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [chromeLogs, setChromeLogs] = useState<DraggedItem[]>([]);
   const [customImages, setCustomImages] = useState<CustomImage[]>([]);
   const [imageCards, setImageCards] = useState<DraggedItem[]>([]);
+  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
+  const [currentDiaryId, setCurrentDiaryId] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [aiSuggestedLayout, setAiSuggestedLayout] = useState<any>(null);
   const [layoutApplied, setLayoutApplied] = useState(false);
-  const [scrapItems, setScrapItems] = useState<DraggedItem[]>([]);
+
+  const [learningStatus, setLearningStatus] = useState<any>(null);
+  const [existingDiary, setExistingDiary] = useState<any>(null);
+  const [userLayout, setUserLayout] = useState<any>(null); // 사용자가 편집한 레이아웃
+  const [rewardInfo, setRewardInfo] = useState<any>(null); // 보상 계산 정보
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedCard, setDraggedCard] = useState<any>(null);
   const today = new Date();
   
-  // 실제 DB에서 가져온 일기 데이터
-  const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
 
-  // 일기 데이터를 DB에서 가져오는 함수
-  const fetchDiaries = async () => {
+=======
+  const [scrapItems, setScrapItems] = useState<DraggedItem[]>([]);
+  
+  
+  
+
+  // 학습 상태 확인 함수
+  const fetchLearningStatus = async () => {
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData?.user) {
-        console.error('사용자 정보를 가져올 수 없습니다.', userError);
-        return;
-      }
-
-      const userId = userData.user.id;
+      console.log('🔄 학습 상태 조회 시작...');
+      const response = await fetch('http://localhost:8000/api/rl/learning-status');
+      console.log('📡 API 응답 상태:', response.status, response.statusText);
       
-      // 2025년 7월 일기 데이터 가져오기
-      const { data, error } = await supabase
-        .from('diaries')
-        .select('date, mood_vector, final_text, status')
-        .eq('user_id', userId)
-        .gte('date', '2025-07-01')
-        .lte('date', '2025-07-31')
-        .order('date', { ascending: true });
-
-      if (error) {
-        console.error('일기 데이터 불러오기 실패:', error);
-        return;
-      }
-
-      console.log('📝 일기 데이터 조회 결과:', {
-        userId: userId,
-        data: data,
-        count: data?.length || 0
-      });
-
-      if (data) {
-        const formatted: DiaryEntry[] = data.map((diary: any) => {
-          // mood_vector를 이모지로 변환
-          let moodEmoji = '😊'; // 기본값
-          if (diary.mood_vector && Array.isArray(diary.mood_vector)) {
-            const [valence, arousal] = diary.mood_vector;
-            
-            // 2D 감정 벡터를 이모지로 매핑
-            if (valence > 0.5 && arousal > 0.3) moodEmoji = '😄'; // 매우 긍정적, 높은 각성
-            else if (valence > 0.3 && arousal > 0.3) moodEmoji = '😊'; // 긍정적, 높은 각성
-            else if (valence > 0.3 && arousal <= 0.3) moodEmoji = '😌'; // 긍정적, 낮은 각성
-            else if (valence > 0 && arousal > 0.3) moodEmoji = '🤔'; // 약간 긍정적, 높은 각성
-            else if (valence > 0 && arousal <= 0.3) moodEmoji = '😌'; // 약간 긍정적, 낮은 각성
-            else if (valence <= 0 && arousal > 0.3) moodEmoji = '😠'; // 부정적, 높은 각성
-            else if (valence <= 0 && arousal <= 0.3) moodEmoji = '😔'; // 부정적, 낮은 각성
-            else if (valence < -0.5 && arousal > 0.3) moodEmoji = '😡'; // 매우 부정적, 높은 각성
-            else if (valence < -0.5 && arousal <= 0.3) moodEmoji = '😢'; // 매우 부정적, 낮은 각성
-          }
-
-          return {
-            date: diary.date,
-            mood: moodEmoji,
-            hasEntry: diary.status === 'completed',
-            content: diary.final_text || '일기 내용이 없습니다.'
-          };
-        });
-        
-        setDiaries(formatted);
+      if (response.ok) {
+        const status = await response.json();
+        console.log('📊 받은 학습 상태:', status);
+        setLearningStatus(status);
+      } else {
+        console.error('❌ API 호출 실패:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('📋 에러 내용:', errorText);
       }
     } catch (error) {
-      console.error('일기 데이터 불러오기 실패:', error);
+      console.error('❌ 학습 상태 조회 실패:', error);
+      console.error('🔍 에러 상세:', error);
     }
   };
+
+  // URL 파라미터에서 날짜 가져오기
+  useEffect(() => {
+    if (router.isReady) {
+      const { date } = router.query;
+      if (date && typeof date === 'string') {
+        const parsedDate = new Date(date);
+        setSelectedDate(parsedDate);
+      }
+    }
+  }, [router.isReady, router.query]);
+
+  // 페이지 로드 시 일기 ID 생성 및 기존 일기 확인
+  useEffect(() => {
+    const initializeDiary = async () => {
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData?.user) {
+          console.error('사용자 정보를 가져올 수 없습니다.', userError);
+          return;
+        }
+
+        const dateString = selectedDate.toISOString().split('T')[0];
+
+        // 기존 일기 확인
+        const { data: existingData, error: existingError } = await supabase
+          .from('diaries')
+          .select('*')
+          .eq('user_id', userData.user.id)
+          .eq('date', dateString)
+          .single();
+
+        if (existingData) {
+          console.log('✅ 기존 일기 발견:', existingData);
+          setExistingDiary(existingData);
+          setCurrentDiaryId(existingData.id);
+          setDiaryText(existingData.final_text || '');
+        } else {
+          // 새로운 일기 생성
+          const diaryId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+
+          const diaryData = {
+            id: diaryId,
+            user_id: userData.user.id,
+            date: dateString,
+            status: 'draft',
+            mood_vector: [0, 0],
+            final_text: '',
+            agent_version: 'v1.0'
+          };
+
+          const { data, error } = await supabase
+            .from('diaries')
+            .insert([diaryData])
+            .select();
+
+          if (error) {
+            console.error('일기 생성 실패:', error);
+            return;
+          }
+
+          console.log('✅ 새 일기 생성 완료:', data);
+          setCurrentDiaryId(diaryId);
+        }
+        
+        // 학습 상태 확인
+        fetchLearningStatus();
+        
+      } catch (error) {
+        console.error('일기 초기화 중 오류:', error);
+      }
+    };
+
+    if (selectedDate) {
+      initializeDiary();
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     // 일기 데이터 가져오기
@@ -144,7 +209,7 @@ export default function WriteDiary() {
         .eq('user_id', userId)
         .gte('visit_time', startOfDay.toISOString())
         .lt('visit_time', endOfDay.toISOString())
-        .not('duration', 'is', null)  // duration이 null이 아닌 것만 조회
+        .not('duration', 'is', null)
         .order('duration', { ascending: false })
         .limit(3);
   
@@ -163,7 +228,7 @@ export default function WriteDiary() {
       if (data) {
         const formatted: DraggedItem[] = data.map((log: any) => {
           console.log('📊 개별 로그 데이터:', log);
-          const duration = log.duration ?? 0;  // null이나 undefined인 경우 0으로 처리
+          const duration = log.duration ?? 0;
           const minutes = Math.floor(duration / 60);
           const seconds = duration % 60;
           const durationText = minutes > 0 
@@ -274,6 +339,62 @@ export default function WriteDiary() {
     fetchScrapItems();
   }, [selectedDate]);
 
+
+  // 크롬 로그 클릭 핸들러 - cards DB에 저장
+  const handleChromeLogClick = async (item: DraggedItem) => {
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        console.error('사용자 정보를 가져올 수 없습니다.', userError);
+        return;
+      }
+
+      // UUID 생성
+      const cardId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+
+      const cardData = {
+        id: cardId,
+        diary_id: currentDiaryId,
+        source_type: 'chrome',
+        category: 'browsing',
+        content: item.content,
+        image_url: null,
+        layout_type: 'text',
+        row: 0,
+        col: 0,
+        order_index: selectedCards.length,
+        text_generated: false,
+        text_final: item.title
+      };
+
+      const { data, error } = await supabase
+        .from('cards')
+        .insert([cardData])
+        .select();
+
+      if (error) {
+        console.error('카드 저장 실패:', error);
+        return;
+      }
+
+      console.log('✅ 크롬 로그 카드 저장 완료:', data);
+      
+      // 선택된 카드 목록에 추가
+      if (data && data[0]) {
+        setSelectedCards(prev => [...prev, data[0]]);
+      }
+
+      // 드래그 아이템에도 추가
+      setDraggedItems(prev => [...prev, item]);
+      
+    } catch (error) {
+      console.error('크롬 로그 카드 저장 중 오류:', error);
+    }
+=======
   // 컴포넌트 마운트 시 일기 데이터 가져오기
   useEffect(() => {
     setMounted(true);
@@ -283,61 +404,225 @@ export default function WriteDiary() {
   // 오늘 날짜인지 확인하는 함수
   const isToday = (date: Date) => {
     return date.toDateString() === today.toDateString();
+
   };
 
-  // 기존 getDiaryInfo를 diaries에서 찾도록 변경
-  const getDiaryInfo = (date: Date) => {
-    const dateString = date.toISOString().split('T')[0];
-    return diaries.find((d) => d.date === dateString);
+  // 사진 카드 클릭 핸들러 - cards DB에 저장
+  const handleImageCardClick = async (card: DraggedItem) => {
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        console.error('사용자 정보를 가져올 수 없습니다.', userError);
+        return;
+      }
+
+      // UUID 생성
+      const cardId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+
+      const cardData = {
+        id: cardId,
+        diary_id: currentDiaryId,
+        source_type: 'image',
+        category: 'photo',
+        content: card.content,
+        image_url: card.imageUrl || null,
+        layout_type: 'image',
+        row: 0,
+        col: 0,
+        order_index: selectedCards.length,
+        text_generated: false,
+        text_final: card.title
+      };
+
+      const { data, error } = await supabase
+        .from('cards')
+        .insert([cardData])
+        .select();
+
+      if (error) {
+        console.error('카드 저장 실패:', error);
+        return;
+      }
+
+      console.log('✅ 이미지 카드 저장 완료:', data);
+      
+      // 선택된 카드 목록에 추가
+      if (data && data[0]) {
+        setSelectedCards(prev => [...prev, data[0]]);
+      }
+
+      // 드래그 아이템에도 추가
+      setDraggedItems(prev => [...prev, card]);
+      
+    } catch (error) {
+      console.error('이미지 카드 저장 중 오류:', error);
+    }
   };
 
-  // 일기 저장 핸들러 (감정 분석 포함 - kobert)
+  // 일기 저장 핸들러
   const handleSaveDiary = async () => {
     if (!diaryText) {
         alert('일기 내용을 입력해주세요.');
         return;
     }
 
-    // 1. AI 레이아웃 피드백 학습 (레이아웃이 적용된 경우)
-    if (aiSuggestedLayout && layoutApplied) {
-      try {
-        // 현재 레이아웃 수집 (사용자가 수정한 후)
-        const currentLayout = getCurrentLayoutFromUI();
-        
-        // 피드백 학습 API 호출 (나중에 활성화)
-        /*
-        await fetch('http://localhost:5001/api/rl/learn-from-feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            aiLayout: aiSuggestedLayout,
-            userLayout: currentLayout,
-            diaryId: 'temp-diary-id',
-            userId: 'temp-user-id'
-          })
-        });
-        */
-        
-        console.log('📚 사용자 피드백 학습 완료');
-        console.log('AI 제안:', aiSuggestedLayout);
-        console.log('사용자 수정:', currentLayout);
-        
-      } catch (error) {
-        console.error('피드백 학습 실패:', error);
-      }
-    }
-
-    // 2. 감정 분석 API 호출
+    // 감정 분석 API 호출
     const sentimentResult = await fetchSentiment(diaryText);
 
-    // 3. 분석 결과에서 감정 라벨을 이모지로 변환
-    let moodEmoji = '😊'; // 기본값
+    // 랜덤 감정 벡터 생성 (valence: -1~1, arousal: -1~1)
+    const randomValence = (Math.random() - 0.5) * 2; // -1 ~ 1
+    const randomArousal = (Math.random() - 0.5) * 2; // -1 ~ 1
+    const moodVector = [randomValence, randomArousal];
+
+    // 감정 분석 결과가 있으면 그것을 우선 사용, 없으면 랜덤 값 사용
+    let finalMoodVector = moodVector;
     if (sentimentResult) {
-        if (sentimentResult.label === 'positive') moodEmoji = '😊';
-        else if (sentimentResult.label === 'negative') moodEmoji = '😔';
-        else moodEmoji = '😐';
+        if (sentimentResult.label === 'positive') {
+          finalMoodVector = [0.5 + Math.random() * 0.5, -0.5 + Math.random() * 1]; // 긍정적
+        } else if (sentimentResult.label === 'negative') {
+          finalMoodVector = [-0.5 - Math.random() * 0.5, -0.5 + Math.random() * 1]; // 부정적
+        } else {
+          finalMoodVector = [-0.2 + Math.random() * 0.4, -0.2 + Math.random() * 0.4]; // 중립적
+        }
     }
 
+    // 레이아웃 차이 기반 보상 계산
+    let layoutReward = 0;
+    let layoutDifference = 0;
+    let rewardDetails = {};
+
+    if (aiSuggestedLayout && userLayout) {
+      // AI 추천과 사용자 레이아웃 간의 차이 계산
+      let totalRowDiff = 0;
+      let totalColDiff = 0;
+      let comparedCards = 0;
+
+      Object.keys(aiSuggestedLayout).forEach(cardId => {
+        if (userLayout[cardId]) {
+          const aiPos = aiSuggestedLayout[cardId];
+          const userPos = userLayout[cardId];
+          
+          const rowDiff = Math.abs(aiPos.row - userPos.row);
+          const colDiff = Math.abs(aiPos.col - userPos.col);
+          
+          totalRowDiff += rowDiff;
+          totalColDiff += colDiff;
+          comparedCards++;
+        }
+      });
+
+      if (comparedCards > 0) {
+        const avgRowDiff = totalRowDiff / comparedCards;
+        const avgColDiff = totalColDiff / comparedCards;
+        layoutDifference = avgRowDiff + avgColDiff;
+        
+        // 차이가 클수록 부정적 보상 (사용자가 많이 수정했다는 의미)
+        layoutReward = -layoutDifference * 20; // 차이당 -20점
+        
+        rewardDetails = {
+          avg_row_diff: avgRowDiff,
+          avg_col_diff: avgColDiff,
+          total_difference: layoutDifference,
+          compared_cards: comparedCards
+        };
+      }
+    } else if (aiSuggestedLayout && !userLayout) {
+      // AI 추천을 그대로 사용한 경우 (긍정적 보상)
+      layoutReward = 50;
+      rewardDetails = { used_ai_layout: true };
+    }
+
+    // 보상 정보 저장
+    setRewardInfo({
+      layoutReward,
+      layoutDifference,
+      details: rewardDetails
+    });
+
+    // diaries 테이블 업데이트
+    try {
+      const { data, error } = await supabase
+        .from('diaries')
+        .update({
+          status: 'finalized',
+          mood_vector: finalMoodVector,
+          final_text: diaryText,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentDiaryId)
+        .select();
+
+      if (error) {
+        console.error('일기 업데이트 실패:', error);
+        return;
+      }
+
+      console.log('✅ 일기 업데이트 완료:', data);
+      console.log('🎭 감정 벡터:', finalMoodVector);
+      console.log('💰 레이아웃 보상:', layoutReward, '차이:', layoutDifference);
+    } catch (error) {
+      console.error('일기 업데이트 중 오류:', error);
+    }
+
+
+    // RL 모델에 피드백 전송
+    if (aiSuggestedLayout) {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          // 선택된 카드 ID들을 관련 카드로 전달
+          const selectedCardIds = selectedCards.map(card => card.id);
+          
+          console.log('🔄 RL 피드백 전송 시작...');
+          console.log('📊 전송할 데이터:', {
+            diary_id: currentDiaryId,
+            feedback_type: 'save',
+            selected_cards: selectedCardIds,
+            layout_reward: layoutReward,
+            layout_difference: layoutDifference
+          });
+          
+          const feedbackResponse = await fetch('http://localhost:8000/api/rl/learn-from-feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              diary_id: currentDiaryId,
+              feedback_type: 'save',
+              details: {
+                user_id: userData.user.id,
+                original_layout: aiSuggestedLayout,
+                user_layout: userLayout,
+                layout_reward: layoutReward,
+                layout_difference: layoutDifference,
+                reward_details: rewardDetails,
+                final_text_length: diaryText.length,
+                mood_vector: finalMoodVector,
+                related_card_id: selectedCardIds.length > 0 ? selectedCardIds[0] : null
+              }
+            })
+          });
+          
+          if (feedbackResponse.ok) {
+            const result = await feedbackResponse.json();
+            console.log('✅ RL 피드백 전송 완료:', result);
+            // 학습 상태 업데이트
+            setTimeout(() => fetchLearningStatus(), 1000);
+          } else {
+            const errorText = await feedbackResponse.text();
+            console.error('❌ RL 피드백 전송 실패:', feedbackResponse.status, errorText);
+          }
+        }
+      } catch (error) {
+        console.error('❌ RL 피드백 전송 중 오류:', error);
+      }
+    } else {
+      console.log('⚠️ AI 레이아웃이 없어서 RL 피드백을 전송하지 않습니다.');
+    }
+=======
     // 4. DB에 일기 저장
     const dateString = selectedDate.toISOString().split('T')[0];
     
@@ -426,19 +711,15 @@ export default function WriteDiary() {
     setViewMode('calendar');
   };
 
-  // 현재 UI의 레이아웃을 수집하는 함수 (시뮬레이션)
-  const getCurrentLayoutFromUI = () => {
-    // 실제로는 현재 드래그된 카드들의 위치를 수집
-    // 현재는 시뮬레이션용으로 AI 제안과 동일하게 반환
-    return aiSuggestedLayout;
+
+    alert('일기가 저장되었습니다!');
+    
+    // 캘린더 페이지로 이동
+    router.push('/diary/calendar');
   };
 
   // 카드 ID로 카드 데이터를 찾는 함수
   const findCardData = (cardId: string) => {
-    // 위젯 카드에서 찾기
-    const widgetCard = draggedItems.find(item => item.id === cardId);
-    if (widgetCard) return widgetCard;
-
     // 크롬 로그에서 찾기
     const chromeCard = chromeLogs.find(log => log.id === cardId);
     if (chromeCard) return chromeCard;
@@ -450,44 +731,57 @@ export default function WriteDiary() {
     return null;
   };
 
-  // 카드 드래그 시작 핸들러
-  const handleCardDragStart = (e: React.DragEvent, cardData: DraggedItem) => {
-    e.dataTransfer.setData('application/json', JSON.stringify(cardData));
-  };
-
-  // 일기 작성 모드로 전환
-  const handleWriteDiary = (date?: Date) => {
-    setSelectedDate(date || today);
-    setViewMode('write');
-  };
-
-  // 날짜 클릭 핸들러
-  const handleDateClick = (date: Date) => {
-    const diaryInfo = getDiaryInfo(date);
-    if (diaryInfo && diaryInfo.hasEntry) {
-      setViewMode('read');
-    } else {
-      setViewMode('write');
-    }
-    setSelectedDate(date);
-  };
-
-  // 드래그 앤 드롭 핸들러들
-  const handleDragStart = (e: React.DragEvent, item: DraggedItem) => {
-    e.dataTransfer.setData('application/json', JSON.stringify(item));
+  // 드래그 앤 드롭 이벤트 핸들러
+  const handleDragStart = (e: React.DragEvent, card: Card) => {
+    setIsDragging(true);
+    setDraggedCard(card);
+    e.dataTransfer.setData('text/plain', card.id);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, targetRow: number, targetCol: number) => {
+    e.preventDefault();
+    if (!draggedCard) return;
+
+    // 새로운 레이아웃 생성
+    const newLayout = userLayout ? { ...userLayout } : {};
+    newLayout[draggedCard.id] = { row: targetRow, col: targetCol, order_index: 0 };
+    
+    setUserLayout(newLayout);
+    setIsDragging(false);
+    setDraggedCard(null);
+    
+    console.log('🎯 카드 이동:', draggedCard.id, '→', `(${targetRow}, ${targetCol})`);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDraggedCard(null);
+  };
+
+  // 기존 드래그 핸들러들 (DraggedItem용)
+  const handleCardDragStart = (e: React.DragEvent, cardData: DraggedItem) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(cardData));
+  };
+
+  const handleItemDragStart = (e: React.DragEvent, item: DraggedItem) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(item));
+  };
+
+  const handleItemDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
     setIsDragOver(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleItemDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleItemDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     
@@ -505,11 +799,75 @@ export default function WriteDiary() {
     }
   };
 
+  // 레이아웃 그리드 렌더링
+  const renderLayoutGrid = () => {
+    const grid = Array(3).fill(null).map(() => Array(4).fill(null));
+    
+    // AI 추천 레이아웃 적용
+    if (aiSuggestedLayout && !userLayout) {
+      Object.entries(aiSuggestedLayout).forEach(([cardId, layout]: [string, any]) => {
+        if (layout.row >= 0 && layout.row < 3 && layout.col >= 0 && layout.col < 4) {
+          grid[layout.row][layout.col] = { cardId, layout, type: 'ai' };
+        }
+      });
+    }
+    
+    // 사용자 편집 레이아웃 적용
+    if (userLayout) {
+      Object.entries(userLayout).forEach(([cardId, layout]: [string, any]) => {
+        if (layout.row >= 0 && layout.row < 3 && layout.col >= 0 && layout.col < 4) {
+          grid[layout.row][layout.col] = { cardId, layout, type: 'user' };
+        }
+      });
+    }
+
+    return (
+      <div className="grid grid-cols-4 gap-2 p-4 bg-gray-50 rounded-lg">
+        {grid.map((row, rowIndex) => 
+          row.map((cell, colIndex) => (
+            <div
+              key={`${rowIndex}-${colIndex}`}
+              className={`
+                aspect-square border-2 border-dashed rounded-lg p-2
+                ${cell ? 'border-solid bg-white' : 'border-gray-300 bg-gray-100'}
+                ${isDragging ? 'border-blue-400 bg-blue-50' : ''}
+                transition-all duration-200
+              `}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, rowIndex, colIndex)}
+            >
+              {cell ? (
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, selectedCards.find(c => c.id === cell.cardId)!)}
+                  onDragEnd={handleDragEnd}
+                  className={`
+                    w-full h-full flex items-center justify-center text-xs font-medium
+                    ${cell.type === 'ai' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}
+                    cursor-move hover:scale-105 transition-transform
+                  `}
+                >
+                  {cell.cardId.slice(0, 8)}...
+                  {cell.type === 'ai' && <span className="ml-1">🤖</span>}
+                  {cell.type === 'user' && <span className="ml-1">👤</span>}
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                  빈칸
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    );
+  };
+
   // 사진 추가 핸들러
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      Array.from(files).forEach(file => {
+      Array.from(files).forEach((file: File) => {
         if (file.type.startsWith('image/')) {
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -551,7 +909,7 @@ export default function WriteDiary() {
           type: 'custom',
           title: image.description || '설명 없음',
           content: `${image.description || '설명 없음'}\n[사진 첨부됨]`,
-          imageUrl: image.previewUrl // 사진 URL 추가
+          imageUrl: image.previewUrl
         };
         setImageCards(prev => [...prev, newCard]);
         
@@ -595,95 +953,54 @@ export default function WriteDiary() {
     e.dataTransfer.setData('application/json', JSON.stringify(dragItem));
   };
 
-  // 캘린더로 돌아가기
-  const handleBackToCalendar = () => {
-    setViewMode('calendar');
-    setDiaryText('');
-  };
-
-  const handleGenerateDiary = () => {
-    setIsGenerating(true);
-    // 실제로는 AI API 호출
-    setTimeout(() => {
-      setDiaryText(`오늘은 정말 바쁜 하루였다. 아침에 일어나서 대시보드를 확인했는데, 날씨가 맑아서 기분이 좋았다. 
-
-점심에는 새로운 프로젝트에 대해 회의를 했는데, 팀원들과 좋은 아이디어를 많이 나눌 수 있었다. 
-
-저녁에는 집에서 조용히 시간을 보내며 내일을 위한 계획을 세웠다. 
-
-전반적으로 만족스러운 하루였다.`);
-      setIsGenerating(false);
-    }, 2000);
-  };
-
   // AI 레이아웃 제안 함수
   const handleAutoLayout = async () => {
     try {
       setIsGenerating(true);
       
-      // 현재 선택된 모든 카드 수집
-      const allCards = [
-        ...draggedItems.map(item => ({
-          id: item.id,
-          type: item.type,
-          title: item.title,
-          content: item.content,
-          imageUrl: item.imageUrl,
-          category: 'widget'
-        })),
-        ...chromeLogs.map(log => ({
-          id: log.id,
-          type: 'chrome',
-          title: log.title,
-          content: log.content,
-          imageUrl: undefined,
-          category: 'browsing'
-        })),
-        ...imageCards.map(card => ({
-          id: card.id,
-          type: 'custom',
-          title: card.title,
-          content: card.content,
-          imageUrl: card.imageUrl,
-          category: 'photo'
-        }))
-      ];
-
-      if (allCards.length === 0) {
-        alert('배치할 카드가 없습니다. 위젯, 크롬 로그, 또는 사진을 추가해주세요.');
+      // 선택된 카드들의 ID 수집
+      const selectedCardIds = selectedCards.map(card => card.id);
+      
+      if (selectedCardIds.length === 0) {
+        alert('배치할 카드가 없습니다. 크롬 로그나 사진을 선택해주세요.');
         setIsGenerating(false);
         return;
       }
 
-      // AI API 호출 (현재는 시뮬레이션)
-      console.log('🎨 AI 레이아웃 제안 요청:', allCards);
-      
-      // 실제 API 호출 (나중에 활성화)
-      /*
-      const response = await fetch('http://localhost:5001/api/rl/suggest-layout', {
+      // 사용자 정보 가져오기
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        console.error('사용자 정보를 가져올 수 없습니다.', userError);
+        setIsGenerating(false);
+        return;
+      }
+
+      // RL API 호출
+      const response = await fetch('http://localhost:8000/api/rl/suggest-layout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cards: allCards,
-          diaryId: 'temp-diary-id',
-          userId: 'temp-user-id'
+          diary_id: currentDiaryId,
+          user_id: userData.user.id,
+          selected_card_ids: selectedCardIds
         })
       });
       
+      if (!response.ok) {
+        throw new Error(`RL API 호출 실패: ${response.status}`);
+      }
+      
       const result = await response.json();
-      */
       
-      // 시뮬레이션 결과 (임시)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const simulatedLayout = generateSimulatedLayout(allCards);
-      setAiSuggestedLayout(simulatedLayout);
-      
-      // 레이아웃을 UI에 적용
-      applyLayoutToUI(simulatedLayout);
-      setLayoutApplied(true);
-      
-      console.log('✅ AI 레이아웃 적용 완료:', simulatedLayout);
+      if (result.success) {
+        console.log('✅ AI 레이아웃 제안 완료:', result.layout);
+        
+        // 레이아웃을 UI에 적용
+        applyLayoutToUI(result.layout);
+        setLayoutApplied(true);
+      } else {
+        throw new Error(result.message || '레이아웃 제안 실패');
+      }
       
     } catch (error) {
       console.error('AI 레이아웃 제안 실패:', error);
@@ -693,116 +1010,12 @@ export default function WriteDiary() {
     }
   };
 
-  // 시뮬레이션용 레이아웃 생성 (임시)
-  const generateSimulatedLayout = (cards: any[]) => {
-    const layout = {
-      rows: [],
-      card_positions: {}
-    };
-
-    // 카드 타입별 분류
-    const widgetCards = cards.filter(card => card.type === 'widget');
-    const chromeCards = cards.filter(card => card.type === 'chrome');
-    const photoCards = cards.filter(card => card.type === 'custom');
-
-    let rowIndex = 0;
-    let cardIndex = 0;
-
-    // 1. 위젯 카드들을 첫 번째 row에 배치
-    if (widgetCards.length > 0) {
-      const row = {
-        rowIndex: rowIndex,
-        cards: []
-      };
-
-      widgetCards.forEach((card, colIdx) => {
-        const cardWidth = widgetCards.length === 1 ? '100%' : `${100 / widgetCards.length}%`;
-        row.cards.push({
-          id: card.id,
-          width: cardWidth,
-          type: 0,
-          hasImage: false
-        });
-
-        layout.card_positions[card.id] = {
-          row: rowIndex,
-          col: colIdx,
-          orderIndex: colIdx
-        };
-        cardIndex++;
-      });
-
-      layout.rows.push(row);
-      rowIndex++;
-    }
-
-    // 2. 크롬 카드들을 두 번째 row에 배치
-    if (chromeCards.length > 0) {
-      const row = {
-        rowIndex: rowIndex,
-        cards: []
-      };
-
-      chromeCards.forEach((card, colIdx) => {
-        const cardWidth = chromeCards.length === 1 ? '100%' : `${100 / chromeCards.length}%`;
-        row.cards.push({
-          id: card.id,
-          width: cardWidth,
-          type: 1,
-          hasImage: false
-        });
-
-        layout.card_positions[card.id] = {
-          row: rowIndex,
-          col: colIdx,
-          orderIndex: colIdx
-        };
-        cardIndex++;
-      });
-
-      layout.rows.push(row);
-      rowIndex++;
-    }
-
-    // 3. 사진 카드들을 세 번째 row에 배치
-    if (photoCards.length > 0) {
-      const row = {
-        rowIndex: rowIndex,
-        cards: []
-      };
-
-      photoCards.forEach((card, colIdx) => {
-        const cardWidth = photoCards.length === 1 ? '100%' : `${100 / photoCards.length}%`;
-        row.cards.push({
-          id: card.id,
-          width: cardWidth,
-          type: 2,
-          hasImage: true
-        });
-
-        layout.card_positions[card.id] = {
-          row: rowIndex,
-          col: colIdx,
-          orderIndex: colIdx
-        };
-        cardIndex++;
-      });
-
-      layout.rows.push(row);
-    }
-
-    return layout;
-  };
-
   // 레이아웃을 UI에 적용하는 함수
   const applyLayoutToUI = (layout: any) => {
     // 레이아웃 정보를 콘솔에 출력
     console.log('📋 적용된 레이아웃:');
-    layout.rows.forEach((row: any) => {
-      console.log(`  Row ${row.rowIndex}: ${row.cards.length}개 카드`);
-      row.cards.forEach((card: any) => {
-        console.log(`    - ${card.id} (너비: ${card.width})`);
-      });
+    Object.entries(layout).forEach(([cardId, position]: [string, any]) => {
+      console.log(`  - ${cardId}: row=${position.row}, col=${position.col}, order=${position.order_index}`);
     });
 
     // 레이아웃 상태 업데이트 (UI에 시각적으로 표시됨)
@@ -810,65 +1023,64 @@ export default function WriteDiary() {
     setLayoutApplied(true);
   };
 
-  // 캘린더 타일 렌더링 커스터마이징
-  const tileContent = ({ date, view }: { date: Date; view: string }) => {
-    if (view === 'month') {
-      const diaryInfo = getDiaryInfo(date);
-      const isTodayDate = isToday(date);
+  // 배치 학습 핸들러
+  const handleBatchTrain = async () => {
+    try {
+      console.log('🔄 배치 학습 시작...');
       
-      return (
-        <div className="relative w-full h-full flex flex-col items-center justify-start cursor-pointer pt-2" onClick={() => handleDateClick(date)}>
-          {/* 날짜 - 상단에 배치 */}
-          <div className={`font-bold ${isTodayDate ? 'text-blue-600 text-xl' : 'text-gray-700'} mb-2`}>
-            {date.getDate()}
-          </div>
-          
-          {/* 일기 상태 표시 - 이모지만 (더 크게) */}
-          {diaryInfo && diaryInfo.hasEntry && (
-            <div className="text-4xl">
-              {diaryInfo.mood}
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
+      const response = await fetch('http://localhost:8000/api/rl/batch-train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
 
-  // 캘린더 타일 클래스 커스터마이징
-  const tileClassName = ({ date, view }: { date: Date; view: string }) => {
-    if (view === 'month') {
-      const diaryInfo = getDiaryInfo(date);
-      const isTodayDate = isToday(date);
+      if (!response.ok) {
+        throw new Error(`배치 학습 실패: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ 배치 학습 완료:', result);
       
-      // 공휴일 체크 (2025년 7월 기준)
-      const holidays = [
-        '2025-07-01', // 없음
-        '2025-07-17', // 제헌절
-      ];
-      const dateString = date.toISOString().split('T')[0];
-      const isHoliday = holidays.includes(dateString);
-      
-      // 주말 체크 (일요일: 0, 토요일: 6)
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      
-      let className = '';
-      
-      if (isTodayDate) {
-        className = 'bg-gradient-to-br from-blue-100 to-cyan-100 border-2 border-blue-300 rounded-full shadow-lg transform scale-110';
-      } else if (diaryInfo && diaryInfo.hasEntry) {
-        className = 'bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-all duration-200';
-      } else if (isHoliday) {
-        className = 'hover:bg-red-50 rounded-lg transition-all duration-200';
-      } else if (isWeekend) {
-        className = 'hover:bg-red-50 rounded-lg transition-all duration-200';
+      if (result.success) {
+        alert(`배치 학습 완료!\n처리된 에피소드: ${result.episodes_processed}개\n수행된 업데이트: ${result.updates_performed}개\n평균 손실: ${result.average_loss}`);
       } else {
-        className = 'hover:bg-blue-50 rounded-lg transition-all duration-200';
+        alert(`배치 학습 실패: ${result.message}`);
       }
       
-      return className;
+      setTimeout(() => fetchLearningStatus(), 1000); // 학습 상태 업데이트
+    } catch (error) {
+      console.error('배치 학습 중 오류:', error);
+      alert('배치 학습에 실패했습니다.');
     }
-    return '';
+  };
+
+  // 테스트 데이터 생성 핸들러
+  const handleCreateTestData = async () => {
+    try {
+      console.log('🧪 테스트 데이터 생성 시작...');
+      
+      const response = await fetch('http://localhost:8000/api/rl/create-test-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`테스트 데이터 생성 실패: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ 테스트 데이터 생성 완료:', result);
+      
+      if (result.success) {
+        alert(`테스트 데이터 생성 완료!\n테스트 일기 ID: ${result.test_diary_id}\n테스트 카드 ID: ${result.test_card_id}`);
+      } else {
+        alert(`테스트 데이터 생성 실패: ${result.message}`);
+      }
+      
+      setTimeout(() => fetchLearningStatus(), 1000); // 학습 상태 업데이트
+    } catch (error) {
+      console.error('테스트 데이터 생성 중 오류:', error);
+      alert('테스트 데이터 생성에 실패했습니다.');
+    }
   };
 
   return (
@@ -879,100 +1091,140 @@ export default function WriteDiary() {
       </Head>
       <Navigation />
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-5">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* 헤더 */}
-          <header className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-gray-800 mb-3">📝 밤의 일기</h1>
-            <p className="text-gray-600 text-lg">AI가 도와주는 자동 일기 작성</p>
+          <header className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                  📝 {selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 일기
+                </h1>
+                <p className="text-gray-600">
+                  {existingDiary ? '기존 일기를 수정하고 있습니다' : '새로운 일기를 작성하고 있습니다'}
+                </p>
+              </div>
+              <button
+                onClick={() => router.push('/diary/calendar')}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                📅 캘린더로 돌아가기
+              </button>
+            </div>
           </header>
 
-          {!mounted ? (
-            /* 로딩 상태 */
-            <div className="h-screen flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                <p className="text-gray-600">로딩 중...</p>
+
+          {/* 일기 작성 뷰 */}
+          <div className="max-w-6xl mx-auto">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {selectedDate.toLocaleDateString('ko-KR', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    weekday: 'long'
+                  })} 일기
+                </h2>
+                <p className="text-gray-600">카드를 클릭하여 선택하고 일기를 작성하세요</p>
               </div>
             </div>
-          ) : viewMode === 'calendar' ? (
-            /* 캘린더 뷰 */
-            <div className="h-screen flex flex-col">
-              <div className="flex-1 flex items-center justify-center p-6">
-                <Calendar
-                  onChange={(value) => { if (value instanceof Date) { setSelectedDate(value); } }}
-                  value={selectedDate}
-                  tileContent={tileContent}
-                  tileClassName={tileClassName}
-                  className="w-full h-full border-0 bg-transparent text-3xl"
-                  formatDay={(locale, date) => ''}
-                  calendarType="gregory"
-                  locale="ko-KR"
-                />
-              </div>
-              <div className="flex justify-center p-6">
-                <button
-                  onClick={() => handleWriteDiary()}
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-4 px-10 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg text-lg"
-                >
-                  ✏️ 오늘 일기 쓰기
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* 일기 작성/읽기 뷰 */
-            <div className="max-w-6xl mx-auto">
-              {/* 헤더 */}
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    {mounted ? selectedDate.toLocaleDateString('ko-KR', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric',
-                      weekday: 'long'
-                    }) : '일기'} 일기
-                  </h2>
-                  <p className="text-gray-600">
-                    {viewMode === 'read' ? '기존 일기 보기' : 'AI가 도와주는 자동 일기 작성'}
-                  </p>
+
+            {/* 작성 모드 */}
+            <div className="flex gap-7">
+              {/* 첫 번째 칸: 크롬 로그 */}
+              <div className="w-1/2 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
+                <h3 className="text-xl font-semibold mb-4">🌐 크롬 로그</h3>
+                <div className="space-y-2">
+                  {chromeLogs.length > 0 ? (
+                    chromeLogs.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-gray-50 p-3 rounded border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleChromeLogClick(item)}
+                        draggable
+                        onDragStart={(e) => handleItemDragStart(e, item)}
+                      >
+                        <p className="text-sm font-medium truncate" title={item.title}>{item.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{item.content.split('\n')[1]}</p>
+                        <p className="text-xs text-gray-600 font-semibold">{item.content.split('\n')[2]}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-sm">
+                      {selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] 
+                        ? '오늘의 크롬 로그를 불러오는 중이거나 데이터가 없습니다.' 
+                        : `${selectedDate.toLocaleDateString('ko-KR')}의 크롬 로그가 없습니다.`}
+                    </p>
+                  )}
+=======
+
                 </div>
-                <button
-                  onClick={handleBackToCalendar}
-                  className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                >
-                  ← 캘린더로
-                </button>
               </div>
 
-              {viewMode === 'read' ? (
-                /* 읽기 모드 */
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold">📖 일기 읽기</h3>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl">{getDiaryInfo(selectedDate)?.mood}</span>
-                      <span className="text-sm text-gray-600">기분</span>
+              {/* 두 번째 칸: 사진 관리 */}
+              <div className="w-1/2 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
+                <h3 className="text-xl font-semibold mb-4">📸 사진 관리</h3>
+                
+                {/* 사진 업로드 버튼 */}
+                <div className="mb-6">
+                  <label className="block w-full">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageAdd}
+                      className="hidden"
+                    />
+                    <div className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                      <div className="text-2xl mb-2">📷</div>
+                      <p className="text-sm text-gray-600">사진을 선택하거나 여기에 드래그하세요</p>
+                      <p className="text-xs text-gray-500 mt-1">여러 장 선택 가능</p>
                     </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                    <p className="text-gray-800 leading-relaxed">
-                      {getDiaryInfo(selectedDate)?.content || "일기 내용이 없습니다."}
-                    </p>
-                  </div>
-                  
-                  <div className="flex space-x-3">
-                    <button 
-                      onClick={() => setViewMode('write')}
-                      className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex-1"
-                    >
-                      ✏️ 수정하기
-                    </button>
-                    <button className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex-1">
-                      📤 공유하기
-                    </button>
-                  </div>
+                  </label>
                 </div>
+
+
+                {/* 추가된 사진 목록 */}
+                <div className="space-y-3 mb-6">
+                  {customImages.map((image) => (
+                    <div
+                      key={image.id}
+                      className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                    >
+                      <div className="flex items-start space-x-3">
+                        {/* 사진 미리보기 */}
+                        <div className="flex-shrink-0">
+                          <img
+                            src={image.previewUrl}
+                            alt="미리보기"
+                            className="w-16 h-16 object-cover rounded border border-gray-300"
+                            draggable
+                            onDragStart={(e) => handleImageDragStart(e, image)}
+                          />
+                        </div>
+                        
+                        {/* 설명 입력 */}
+                        <div className="flex-1 min-w-0">
+                          <textarea
+                            value={image.description}
+                            onChange={(e) => handleImageDescriptionChange(image.id, e.target.value)}
+                            onKeyPress={(e) => handleImageDescriptionKeyPress(e, image)}
+                            placeholder="이 사진에 대한 설명을 입력하세요... (엔터로 카드 생성)"
+                            className="w-full p-2 text-sm border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows={2}
+                          />
+                        </div>
+                        
+                        {/* 삭제 버튼 */}
+                        <button
+                          onClick={() => handleImageRemove(image.id)}
+                          className="flex-shrink-0 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          title="삭제"
+                        >
+                          🗑️
+                        </button>
+=======
               ) : (
                 /* 작성 모드 */
                 <div className="flex gap-7">
@@ -1038,270 +1290,225 @@ export default function WriteDiary() {
                               : `${selectedDate.toLocaleDateString('ko-KR')}의 크롬 로그가 없습니다.`}
                           </p>
                         )}
+
                       </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
 
-                  {/* 두 번째 칸: 사진 관리 */}
-                  <div className="w-1/4 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
-                    <h3 className="text-xl font-semibold mb-4">📸 사진 관리</h3>
-                    
-                    {/* 사진 업로드 버튼 */}
-                    <div className="mb-6">
-                      <label className="block w-full">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleImageAdd}
-                          className="hidden"
-                        />
-                        <div className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                          <div className="text-2xl mb-2">📷</div>
-                          <p className="text-sm text-gray-600">사진을 선택하거나 여기에 드래그하세요</p>
-                          <p className="text-xs text-gray-500 mt-1">여러 장 선택 가능</p>
-                        </div>
-                      </label>
-                    </div>
+                {/* 구분선 */}
+                <div className="border-t border-gray-200 mb-4"></div>
 
-                    {/* 추가된 사진 목록 */}
-                    <div className="space-y-3 mb-6">
-                      {customImages.map((image) => (
+                {/* 사진 카드 섹션 */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-gray-700">🖼️ 생성된 카드</h4>
+                  <div className="space-y-2">
+                    {imageCards.length > 0 ? (
+                      imageCards.map((card) => (
                         <div
-                          key={image.id}
-                          className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                          key={card.id}
+                          className="bg-purple-50 p-3 rounded border border-purple-200 cursor-pointer hover:bg-purple-100 transition-colors"
+                          onClick={() => handleImageCardClick(card)}
+                          draggable
+                          onDragStart={(e) => handleItemDragStart(e, card)}
                         >
                           <div className="flex items-start space-x-3">
                             {/* 사진 미리보기 */}
-                            <div className="flex-shrink-0">
-                              <img
-                                src={image.previewUrl}
-                                alt="미리보기"
-                                className="w-16 h-16 object-cover rounded border border-gray-300"
-                                draggable
-                                onDragStart={(e) => handleImageDragStart(e, image)}
-                              />
-                            </div>
-                            
-                            {/* 설명 입력 */}
+                            {card.imageUrl && (
+                              <div className="flex-shrink-0">
+                                <img
+                                  src={card.imageUrl}
+                                  alt="카드 이미지"
+                                  className="w-12 h-12 object-cover rounded border border-purple-300"
+                                />
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0">
-                              <textarea
-                                value={image.description}
-                                onChange={(e) => handleImageDescriptionChange(image.id, e.target.value)}
-                                onKeyPress={(e) => handleImageDescriptionKeyPress(e, image)}
-                                placeholder="이 사진에 대한 설명을 입력하세요... (엔터로 카드 생성)"
-                                className="w-full p-2 text-sm border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                rows={2}
-                              />
+                              <p className="text-sm font-medium truncate" title={card.title}>{card.title}</p>
                             </div>
-                            
-                            {/* 삭제 버튼 */}
                             <button
-                              onClick={() => handleImageRemove(image.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleImageCardRemove(card.id);
+                              }}
                               className="flex-shrink-0 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                              title="삭제"
+                              title="카드 삭제"
                             >
                               🗑️
                             </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-
-                    {/* 구분선 */}
-                    <div className="border-t border-gray-200 mb-4"></div>
-
-                    {/* 사진 카드 섹션 */}
-                    <div>
-                      <h4 className="text-lg font-semibold mb-3 text-gray-700">🖼️ 생성된 카드</h4>
-                      <div className="space-y-2">
-                        {imageCards.length > 0 ? (
-                          imageCards.map((card) => (
-                            <div
-                              key={card.id}
-                              className="bg-purple-50 p-3 rounded border border-purple-200 cursor-move hover:bg-purple-100 transition-colors"
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, card)}
-                            >
-                              <div className="flex items-start space-x-3">
-                                {/* 사진 미리보기 */}
-                                {card.imageUrl && (
-                                  <div className="flex-shrink-0">
-                                    <img
-                                      src={card.imageUrl}
-                                      alt="카드 이미지"
-                                      className="w-12 h-12 object-cover rounded border border-purple-300"
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate" title={card.title}>{card.title}</p>
-                                </div>
-                                <button
-                                  onClick={() => handleImageCardRemove(card.id)}
-                                  className="flex-shrink-0 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                  title="카드 삭제"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-gray-500 text-sm text-center py-4">
-                            아직 추가된 사진이 없습니다.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 세 번째 칸: 카드 레이아웃 영역 */}
-                  <div className="w-1/2">
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-semibold">🎨 카드 레이아웃</h3>
-                        <button
-                          className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 ${
-                            layoutApplied 
-                              ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white' 
-                              : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white'
-                          }`}
-                          onClick={handleAutoLayout}
-                          disabled={isGenerating}
-                        >
-                          {isGenerating ? '🤖 AI 배치 중...' : layoutApplied ? '✅ 레이아웃 적용됨' : '🎨 AI 레이아웃 제안'}
-                        </button>
-                      </div>
-
-                      {/* 드롭 영역 */}
-                      <div 
-                        className={`min-h-32 border-2 border-dashed rounded-lg p-4 transition-all duration-200 mb-4 ${
-                          isDragOver 
-                            ? 'border-blue-400 bg-blue-50' 
-                            : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-                        }`}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                      >
-                        <div className="text-center text-gray-500">
-                          <p className="text-sm">
-                            {isDragOver ? '여기에 놓으세요!' : '위젯 스크랩이나 크롬 로그를 여기로 드래그하세요'}
-                          </p>
-                          <p className="text-xs mt-1">또는 이미지/텍스트를 직접 추가하세요</p>
-                        </div>
-                      </div>
-
-                      {/* AI 레이아웃 표시 영역 */}
-                      {layoutApplied && aiSuggestedLayout ? (
-                        <div className="space-y-4">
-                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-sm text-green-700">
-                              ✨ AI가 최적의 레이아웃을 제안했습니다! 
-                              카드들을 드래그해서 위치를 조정할 수 있어요.
-                            </p>
-                          </div>
-                          
-                          {/* 레이아웃 카드들 */}
-                          <div className="space-y-3">
-                            {aiSuggestedLayout.rows.map((row: any, rowIndex: number) => (
-                              <div key={rowIndex} className="flex gap-2">
-                                {row.cards.map((card: any, cardIndex: number) => {
-                                  // 카드 데이터 찾기
-                                  const cardData = findCardData(card.id);
-                                  if (!cardData) return null;
-
-                                  return (
-                                    <div
-                                      key={card.id}
-                                      className={`bg-white border-2 border-gray-200 rounded-lg p-3 shadow-sm transition-all duration-200 hover:shadow-md cursor-move ${
-                                        card.type === 0 ? 'border-blue-200 bg-blue-50' :
-                                        card.type === 1 ? 'border-green-200 bg-green-50' :
-                                        'border-purple-200 bg-purple-50'
-                                      }`}
-                                      style={{ width: card.width }}
-                                      draggable
-                                      onDragStart={(e) => handleCardDragStart(e, cardData)}
-                                    >
-                                      <div className="flex items-start space-x-2">
-                                        {/* 카드 타입별 아이콘 */}
-                                        <div className="flex-shrink-0 text-lg">
-                                          {card.type === 0 ? '📊' : card.type === 1 ? '🌐' : '📸'}
-                                        </div>
-                                        
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="font-medium text-sm text-gray-800 truncate">
-                                            {cardData.title}
-                                          </h4>
-                                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                            {cardData.content}
-                                          </p>
-                                          
-                                          {/* 이미지가 있는 경우 */}
-                                          {cardData.imageUrl && (
-                                            <div className="mt-2">
-                                              <img
-                                                src={cardData.imageUrl}
-                                                alt="카드 이미지"
-                                                className="w-full h-16 object-cover rounded border border-gray-300"
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                      {/* 카드 크기 표시 */}
-                                      <div className="mt-2 text-xs text-gray-500 text-center">
-                                        {card.width}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        /* 레이아웃이 적용되지 않은 경우 */
-                        <div className="text-center py-8 text-gray-500">
-                          <div className="text-4xl mb-2">🎨</div>
-                          <p className="text-sm">AI 레이아웃 제안 버튼을 클릭하면</p>
-                          <p className="text-sm">카드들이 자동으로 배치됩니다!</p>
-                        </div>
-                      )}
-
-                      {/* 일기 텍스트 입력 */}
-                      <div className="mt-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          📝 일기 내용
-                        </label>
-                        <textarea
-                          value={diaryText}
-                          onChange={(e) => setDiaryText(e.target.value)}
-                          placeholder="카드들을 보고 일기를 작성하세요..."
-                          rows={6}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                        />
-                      </div>
-
-                      {/* 저장 버튼 */}
-                      <div className="mt-4">
-                        <button
-                          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                          onClick={handleSaveDiary}
-                        >
-                          💾 일기 저장
-                        </button>
-                      </div>
-                    </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-sm text-center py-4">
+                        아직 추가된 사진이 없습니다.
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          )}
+
+            {/* 선택된 카드들 */}
+            <div className="bg-white rounded-lg p-6 shadow-md">
+              <h3 className="text-lg font-semibold mb-4">📋 선택된 카드들 ({selectedCards.length}개)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedCards.map((card) => (
+                  <div key={card.id} className="p-3 border rounded-lg bg-gray-50">
+                    <p className="text-sm font-medium">{card.source_type}</p>
+                    <p className="text-xs text-gray-600 truncate">{card.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* AI 레이아웃 제안 */}
+            {selectedCards.length > 0 && (
+              <div className="bg-white rounded-lg p-6 shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">🤖 AI 레이아웃 제안</h3>
+                  <button
+                    onClick={handleAutoLayout}
+                    disabled={isGenerating}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition-colors"
+                  >
+                    {isGenerating ? '생성 중...' : '레이아웃 생성'}
+                  </button>
+                </div>
+                
+                {aiSuggestedLayout && (
+                  <div className="mb-4">
+                    <h4 className="font-medium mb-2">AI 추천 레이아웃:</h4>
+                    {renderLayoutGrid()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 사용자 레이아웃 편집 */}
+            {aiSuggestedLayout && (
+              <div className="bg-white rounded-lg p-6 shadow-md">
+                <h3 className="text-lg font-semibold mb-4">✏️ 레이아웃 편집</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  카드를 드래그하여 위치를 변경할 수 있습니다. AI 추천과 다를수록 보상이 감소합니다.
+                </p>
+                {renderLayoutGrid()}
+                
+                {/* 보상 정보 표시 */}
+                {rewardInfo && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">💰 보상 계산 정보</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-blue-600">레이아웃 보상:</p>
+                        <p className={`font-bold ${rewardInfo.layoutReward >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {rewardInfo.layoutReward.toFixed(1)}점
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-blue-600">레이아웃 차이:</p>
+                        <p className="font-bold text-gray-800">{rewardInfo.layoutDifference.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    {rewardInfo.details.avg_row_diff !== undefined && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        평균 행 차이: {rewardInfo.details.avg_row_diff.toFixed(2)}, 
+                        평균 열 차이: {rewardInfo.details.avg_col_diff.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 일기 텍스트 입력 */}
+            <div className="mt-8 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📝 일기 내용
+              </label>
+              <textarea
+                value={diaryText}
+                onChange={(e) => setDiaryText(e.target.value)}
+                placeholder="선택한 카드들을 보고 일기를 작성하세요..."
+                rows={6}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+              
+              {/* 저장 버튼 */}
+              <div className="mt-4">
+                <button
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  onClick={handleSaveDiary}
+                >
+                  💾 일기 저장
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* 학습 상태 표시 */}
+      {learningStatus && (
+        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-blue-800">🤖 강화학습 모델 상태</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={fetchLearningStatus}
+                className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+              >
+                🔄 새로고침
+              </button>
+              <button
+                onClick={handleBatchTrain}
+                className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors"
+              >
+                🎓 배치 학습
+              </button>
+              <button
+                onClick={handleCreateTestData}
+                className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition-colors"
+              >
+                🧪 테스트 데이터
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-blue-600 font-medium">모델 로드</p>
+              <p className={learningStatus.model_status.loaded ? 'text-green-600' : 'text-red-600'}>
+                {learningStatus.model_status.loaded ? '✅ 완료' : '❌ 실패'}
+              </p>
+            </div>
+            <div>
+              <p className="text-blue-600 font-medium">총 피드백</p>
+              <p className="text-gray-800">{learningStatus.learning_progress.total_feedback}개</p>
+            </div>
+            <div>
+              <p className="text-blue-600 font-medium">긍정 피드백</p>
+              <p className="text-green-600">{learningStatus.learning_progress.positive_feedback}개</p>
+            </div>
+            <div>
+              <p className="text-blue-600 font-medium">평균 보상</p>
+              <p className="text-gray-800">{learningStatus.learning_progress.average_reward}</p>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-gray-600">
+            마지막 업데이트: {new Date().toLocaleTimeString()}
+          </div>
+        </div>
+      )}
+      
+      {/* 학습 상태 로딩 중 표시 */}
+      {!learningStatus && (
+        <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg max-w-2xl mx-auto">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+            <p className="text-gray-600">강화학습 모델 상태 로딩 중...</p>
+          </div>
+        </div>
+      )}
     </>
   );
 } 

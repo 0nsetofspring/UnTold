@@ -102,7 +102,7 @@ class RLEnvironment:
         for card in self.selected_cards_data:
             has_image = 1.0 if card.get('image_url') else 0.0
             has_content = 1.0 if card.get('content') else 0.0
-            # TODO: 카테고리 (source, category) 원-핫 인코딩 등 더 많은 특징 추가 가능
+            # TODO: 카테고리 (source_type, category) 원-핫 인코딩 등 더 많은 특징 추가 가능
             card_features_list.append([has_image, has_content])
         
         # 선택된 카드 특징들을 하나의 벡터로 평탄화. MAX_CARDS_IN_LAYOUT에 맞춰 패딩/트렁케이션.
@@ -198,16 +198,48 @@ class RLEnvironment:
     def calculate_reward(self, feedback_type: str, details: Dict[str, Any] = None) -> float:
         """
         사용자 피드백에 따라 최종 보상 값을 계산합니다.
-        이 함수는 back/api/services/rl_diary_service.py에서 호출됩니다.
+        레이아웃 차이를 기반으로 한 정교한 보상 계산을 수행합니다.
         """
         if feedback_type == 'save':
-            return self.config.REWARD_SAVE
+            # 기본 저장 보상
+            base_reward = self.config.REWARD_SAVE
+            
+            # 레이아웃 차이 기반 보상 조정
+            if details and 'layout_difference' in details:
+                layout_diff = details['layout_difference']
+                layout_reward = details.get('layout_reward', 0)
+                
+                # 레이아웃 차이가 있으면 보상 조정
+                if layout_diff > 0:
+                    # 차이가 클수록 보상 감소 (사용자가 많이 수정했다는 의미)
+                    adjusted_reward = base_reward + layout_reward
+                    print(f"🎯 레이아웃 차이 기반 보상 조정: 기본={base_reward}, 레이아웃={layout_reward}, 최종={adjusted_reward}")
+                    return adjusted_reward
+                else:
+                    # AI 추천을 그대로 사용한 경우 추가 보상
+                    bonus_reward = 20
+                    total_reward = base_reward + bonus_reward
+                    print(f"🎯 AI 추천 사용 보너스: 기본={base_reward}, 보너스={bonus_reward}, 최종={total_reward}")
+                    return total_reward
+            
+            return base_reward
+            
         elif feedback_type == 'modify':
-            # 사용자가 수정한 정도에 따라 보상을 조절할 수도 있습니다.
-            # 예: AI 추천 레이아웃과 사용자 수정 레이아웃의 유사도 등 (details에 original_layout, final_layout이 있다면)
-            # 여기서는 단순히 고정된 MODIFY 보상 반환
-            return self.config.REWARD_MODIFY
+            # 수정 보상 (레이아웃 차이 고려)
+            base_reward = self.config.REWARD_MODIFY
+            
+            if details and 'layout_difference' in details:
+                layout_diff = details['layout_difference']
+                # 차이가 클수록 더 큰 부정적 보상
+                layout_penalty = -layout_diff * 10
+                total_reward = base_reward + layout_penalty
+                print(f"🎯 수정 보상: 기본={base_reward}, 레이아웃 페널티={layout_penalty}, 최종={total_reward}")
+                return total_reward
+            
+            return base_reward
+            
         elif feedback_type == 'regenerate':
+            # 재생성 요청 (가장 부정적)
             return self.config.REWARD_REGENERATE
         else:
-            return 0.0 # 알 수 없는 피드백
+            return 0.0  # 알 수 없는 피드백

@@ -38,7 +38,7 @@ export default function Navigation() {
         </Link>
 
         {/* 오른쪽 메뉴 */}
-        <NavLink href="/diary">일기</NavLink>
+        <NavLink href="/diary/calendar">일기</NavLink>
         <NavLink href="/mypage">마이페이지</NavLink>
       </div>
       <style jsx>{`

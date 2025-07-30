@@ -32,6 +32,7 @@ interface CustomImage {
 }
 
 export default function WriteDiary() {
+  const [mounted, setMounted] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'write' | 'read'>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [diaryText, setDiaryText] = useState('');
@@ -46,24 +47,78 @@ export default function WriteDiary() {
   const [scrapItems, setScrapItems] = useState<DraggedItem[]>([]);
   const today = new Date();
   
-  // 샘플 일기 데이터 (실제로는 API에서 가져올 예정)
-  const [diaries, setDiaries] = useState<DiaryEntry[]>([
-    { date: '2025-07-01', mood: '😊', hasEntry: true, content: '오늘은 정말 바쁜 하루였다.' },
-    { date: '2025-07-03', mood: '😌', hasEntry: true, content: '점심에는 새로운 프로젝트에 대해 회의를 했는데...' },
-    { date: '2025-07-05', mood: '🤔', hasEntry: true, content: '저녁에는 집에서 조용히 시간을 보내며...' },
-    { date: '2025-07-08', mood: '😊', hasEntry: true, content: '전반적으로 만족스러운 하루였다.' },
-    { date: '2025-07-10', mood: '😔', hasEntry: true, content: '오늘은 조금 힘든 하루였다.' },
-    { date: '2025-07-12', mood: '😌', hasEntry: true, content: '그래도 좋은 일이 있었다.' },
-    { date: '2025-07-15', mood: '😊', hasEntry: true, content: '행복한 하루였다.' },
-    { date: '2025-07-17', mood: '🤔', hasEntry: true, content: '생각이 많은 하루였다.' },
-    { date: '2025-07-19', mood: '😌', hasEntry: true, content: '평온한 하루였다.' },
-    { date: '2025-07-22', mood: '😊', hasEntry: true, content: '기분 좋은 하루였다.' },
-    { date: '2025-07-24', mood: '😔', hasEntry: true, content: '조금 우울한 하루였다.' },
-    { date: '2025-07-26', mood: '😌', hasEntry: true, content: '마음이 편안했다.' },
-    { date: '2025-07-28', mood: '😊', hasEntry: true, content: '즐거운 하루였다.' },
-  ]);
+  // 실제 DB에서 가져온 일기 데이터
+  const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
+
+  // 일기 데이터를 DB에서 가져오는 함수
+  const fetchDiaries = async () => {
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        console.error('사용자 정보를 가져올 수 없습니다.', userError);
+        return;
+      }
+
+      const userId = userData.user.id;
+      
+      // 2025년 7월 일기 데이터 가져오기
+      const { data, error } = await supabase
+        .from('diaries')
+        .select('date, mood_vector, final_text, status')
+        .eq('user_id', userId)
+        .gte('date', '2025-07-01')
+        .lte('date', '2025-07-31')
+        .order('date', { ascending: true });
+
+      if (error) {
+        console.error('일기 데이터 불러오기 실패:', error);
+        return;
+      }
+
+      console.log('📝 일기 데이터 조회 결과:', {
+        userId: userId,
+        data: data,
+        count: data?.length || 0
+      });
+
+      if (data) {
+        const formatted: DiaryEntry[] = data.map((diary: any) => {
+          // mood_vector를 이모지로 변환
+          let moodEmoji = '😊'; // 기본값
+          if (diary.mood_vector && Array.isArray(diary.mood_vector)) {
+            const [valence, arousal] = diary.mood_vector;
+            
+            // 2D 감정 벡터를 이모지로 매핑
+            if (valence > 0.5 && arousal > 0.3) moodEmoji = '😄'; // 매우 긍정적, 높은 각성
+            else if (valence > 0.3 && arousal > 0.3) moodEmoji = '😊'; // 긍정적, 높은 각성
+            else if (valence > 0.3 && arousal <= 0.3) moodEmoji = '😌'; // 긍정적, 낮은 각성
+            else if (valence > 0 && arousal > 0.3) moodEmoji = '🤔'; // 약간 긍정적, 높은 각성
+            else if (valence > 0 && arousal <= 0.3) moodEmoji = '😌'; // 약간 긍정적, 낮은 각성
+            else if (valence <= 0 && arousal > 0.3) moodEmoji = '😠'; // 부정적, 높은 각성
+            else if (valence <= 0 && arousal <= 0.3) moodEmoji = '😔'; // 부정적, 낮은 각성
+            else if (valence < -0.5 && arousal > 0.3) moodEmoji = '😡'; // 매우 부정적, 높은 각성
+            else if (valence < -0.5 && arousal <= 0.3) moodEmoji = '😢'; // 매우 부정적, 낮은 각성
+          }
+
+          return {
+            date: diary.date,
+            mood: moodEmoji,
+            hasEntry: diary.status === 'completed',
+            content: diary.final_text || '일기 내용이 없습니다.'
+          };
+        });
+        
+        setDiaries(formatted);
+      }
+    } catch (error) {
+      console.error('일기 데이터 불러오기 실패:', error);
+    }
+  };
 
   useEffect(() => {
+    // 일기 데이터 가져오기
+    fetchDiaries();
+    
     const fetchChromeLogs = async () => {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user) {
@@ -218,6 +273,12 @@ export default function WriteDiary() {
     fetchChromeLogs();
     fetchScrapItems();
   }, [selectedDate]);
+
+  // 컴포넌트 마운트 시 일기 데이터 가져오기
+  useEffect(() => {
+    setMounted(true);
+    fetchDiaries();
+  }, []);
   
   // 오늘 날짜인지 확인하는 함수
   const isToday = (date: Date) => {
@@ -277,18 +338,87 @@ export default function WriteDiary() {
         else moodEmoji = '😐';
     }
 
-    // 4. 기존 저장 로직 실행 (content도 저장)
+    // 4. DB에 일기 저장
     const dateString = selectedDate.toISOString().split('T')[0];
-    setDiaries((prev) => {
-      const exists = prev.some((d) => d.date === dateString);
-      if (exists) {
-        return prev.map((d) =>
-          d.date === dateString ? { ...d, mood: moodEmoji, hasEntry: true, content: diaryText } : d
-        );
-      } else {
-        return [...prev, { date: dateString, mood: moodEmoji, hasEntry: true, content: diaryText }];
+    
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        alert('사용자 정보를 가져올 수 없습니다.');
+        return;
       }
-    });
+
+      const userId = userData.user.id;
+      
+      // mood_vector 계산 (간단한 감정 분석 결과를 2D 벡터로 변환)
+      let moodVector = [0, 0]; // 기본값
+      if (sentimentResult) {
+        if (sentimentResult.label === 'positive') {
+          moodVector = [0.7, 0.4]; // 긍정적, 중간 각성
+        } else if (sentimentResult.label === 'negative') {
+          moodVector = [-0.5, 0.3]; // 부정적, 중간 각성
+        } else {
+          moodVector = [0.1, 0.1]; // 중립적, 낮은 각성
+        }
+      }
+
+      // DB에 저장할 데이터
+      const diaryData = {
+        user_id: userId,
+        date: dateString,
+        status: 'completed',
+        mood_vector: moodVector,
+        final_text: diaryText,
+        agent_version: 'v1.0'
+      };
+
+      // 기존 일기가 있는지 확인
+      const { data: existingDiary } = await supabase
+        .from('diaries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', dateString)
+        .single();
+
+      let result;
+      if (existingDiary) {
+        // 기존 일기 업데이트
+        result = await supabase
+          .from('diaries')
+          .update(diaryData)
+          .eq('id', existingDiary.id);
+      } else {
+        // 새 일기 생성
+        result = await supabase
+          .from('diaries')
+          .insert(diaryData);
+      }
+
+      if (result.error) {
+        console.error('일기 저장 실패:', result.error);
+        alert('일기 저장에 실패했습니다.');
+        return;
+      }
+
+      console.log('✅ 일기 저장 완료:', dateString);
+      
+      // 로컬 상태 업데이트
+      setDiaries((prev) => {
+        const exists = prev.some((d) => d.date === dateString);
+        if (exists) {
+          return prev.map((d) =>
+            d.date === dateString ? { ...d, mood: moodEmoji, hasEntry: true, content: diaryText } : d
+          );
+        } else {
+          return [...prev, { date: dateString, mood: moodEmoji, hasEntry: true, content: diaryText }];
+        }
+      });
+
+    } catch (error) {
+      console.error('일기 저장 중 오류:', error);
+      alert('일기 저장에 실패했습니다.');
+      return;
+    }
     
     // 5. 상태 초기화
     setAiSuggestedLayout(null);
@@ -756,7 +886,15 @@ export default function WriteDiary() {
             <p className="text-gray-600 text-lg">AI가 도와주는 자동 일기 작성</p>
           </header>
 
-          {viewMode === 'calendar' ? (
+          {!mounted ? (
+            /* 로딩 상태 */
+            <div className="h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-600">로딩 중...</p>
+              </div>
+            </div>
+          ) : viewMode === 'calendar' ? (
             /* 캘린더 뷰 */
             <div className="h-screen flex flex-col">
               <div className="flex-1 flex items-center justify-center p-6">
@@ -768,6 +906,7 @@ export default function WriteDiary() {
                   className="w-full h-full border-0 bg-transparent text-3xl"
                   formatDay={(locale, date) => ''}
                   calendarType="gregory"
+                  locale="ko-KR"
                 />
               </div>
               <div className="flex justify-center p-6">
@@ -786,12 +925,12 @@ export default function WriteDiary() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800">
-                    {selectedDate.toLocaleDateString('ko-KR', { 
+                    {mounted ? selectedDate.toLocaleDateString('ko-KR', { 
                       year: 'numeric', 
                       month: 'long', 
                       day: 'numeric',
                       weekday: 'long'
-                    })} 일기
+                    }) : '일기'} 일기
                   </h2>
                   <p className="text-gray-600">
                     {viewMode === 'read' ? '기존 일기 보기' : 'AI가 도와주는 자동 일기 작성'}

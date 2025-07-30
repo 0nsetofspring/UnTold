@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '../../api/axiosInstance';
+import { useScrap } from '@/hooks/useScrap';
 
 interface NewsArticle {
   title: string;
@@ -14,6 +15,11 @@ interface NewsArticle {
 export default function NewsWidget() {
     const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 스크랩 기능 추가
+  const scrapContent = articles.length > 0 ? 
+    `${articles[0].title} - ${articles[0].source.name}` : '';
+  const { isScrapped, isLoading: scrapLoading, toggleScrap } = useScrap('widget', 'news', scrapContent);
 
   useEffect(() => {
     const fetchNewsData = async () => {
@@ -35,6 +41,23 @@ export default function NewsWidget() {
 
   return (
     <div className="bg-white rounded-lg flex flex-col items-start justify-start overflow-hidden p-2">
+      {/* 스크랩 버튼 - 상단에 별도 영역 */}
+      {!isLoading && articles.length > 0 && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={toggleScrap}
+            disabled={scrapLoading}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+              isScrapped 
+                ? 'bg-green-100 text-green-700 border border-green-200' 
+                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+            } ${scrapLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            {scrapLoading ? '처리중...' : isScrapped ? '스크랩됨' : '스크랩하기'}
+          </button>
+        </div>
+      )}
+
       {isLoading ? (
         <p className="text-gray-500">로딩 중...</p>
       ) : articles.length > 0 ? (

@@ -44,7 +44,11 @@ interface Card {
 }
 
 export default function WriteDiary() {
+
   const router = useRouter();
+=======
+
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [diaryText, setDiaryText] = useState('');
   const [draggedItems, setDraggedItems] = useState<DraggedItem[]>([]);
@@ -57,6 +61,7 @@ export default function WriteDiary() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiSuggestedLayout, setAiSuggestedLayout] = useState<any>(null);
   const [layoutApplied, setLayoutApplied] = useState(false);
+
   const [learningStatus, setLearningStatus] = useState<any>(null);
   const [existingDiary, setExistingDiary] = useState<any>(null);
   const [userLayout, setUserLayout] = useState<any>(null); // 사용자가 편집한 레이아웃
@@ -65,22 +70,12 @@ export default function WriteDiary() {
   const [draggedCard, setDraggedCard] = useState<any>(null);
   const today = new Date();
   
-  // 샘플 일기 데이터
-  const [diaries, setDiaries] = useState<DiaryEntry[]>([
-    { date: '2025-07-01', mood: '😊', hasEntry: true, content: '오늘은 정말 바쁜 하루였다.' },
-    { date: '2025-07-03', mood: '😌', hasEntry: true, content: '점심에는 새로운 프로젝트에 대해 회의를 했는데...' },
-    { date: '2025-07-05', mood: '🤔', hasEntry: true, content: '저녁에는 집에서 조용히 시간을 보내며...' },
-    { date: '2025-07-08', mood: '😊', hasEntry: true, content: '전반적으로 만족스러운 하루였다.' },
-    { date: '2025-07-10', mood: '😔', hasEntry: true, content: '오늘은 조금 힘든 하루였다.' },
-    { date: '2025-07-12', mood: '😌', hasEntry: true, content: '그래도 좋은 일이 있었다.' },
-    { date: '2025-07-15', mood: '😊', hasEntry: true, content: '행복한 하루였다.' },
-    { date: '2025-07-17', mood: '🤔', hasEntry: true, content: '생각이 많은 하루였다.' },
-    { date: '2025-07-19', mood: '😌', hasEntry: true, content: '평온한 하루였다.' },
-    { date: '2025-07-22', mood: '😊', hasEntry: true, content: '기분 좋은 하루였다.' },
-    { date: '2025-07-24', mood: '😔', hasEntry: true, content: '조금 우울한 하루였다.' },
-    { date: '2025-07-26', mood: '😌', hasEntry: true, content: '마음이 편안했다.' },
-    { date: '2025-07-28', mood: '😊', hasEntry: true, content: '즐거운 하루였다.' },
-  ]);
+
+=======
+  const [scrapItems, setScrapItems] = useState<DraggedItem[]>([]);
+  
+  
+  
 
   // 학습 상태 확인 함수
   const fetchLearningStatus = async () => {
@@ -186,6 +181,9 @@ export default function WriteDiary() {
   }, [selectedDate]);
 
   useEffect(() => {
+    // 일기 데이터 가져오기
+    fetchDiaries();
+    
     const fetchChromeLogs = async () => {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user) {
@@ -193,10 +191,13 @@ export default function WriteDiary() {
         return;
       }
   
-      const userId = userData.user.id;
-      const selectedDateString = selectedDate.toISOString().split('T')[0];
-  
-      // 날짜 필터링을 위해 UTC 기준으로 조정
+            const userId = userData.user.id;
+      
+      // 한국 시간대로 날짜 처리
+      const koreaTime = new Date(selectedDate.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+      const selectedDateString = koreaTime.toISOString().split('T')[0];
+
+      // 날짜 필터링을 위해 한국 시간 기준으로 조정
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
@@ -246,9 +247,98 @@ export default function WriteDiary() {
         setChromeLogs(formatted);
       }
     };
+
+    const fetchScrapItems = async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        console.error('사용자 정보를 가져올 수 없습니다.', userError);
+        return;
+      }
+
+      const userId = userData.user.id;
+      
+      // 한국 시간대로 날짜 처리
+      const koreaTime = new Date(selectedDate.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+      const selectedDateString = koreaTime.toISOString().split('T')[0];
+
+      console.log('📅 날짜 처리:', {
+        selectedDate: selectedDate,
+        selectedDateString: selectedDateString,
+        selectedDateISO: selectedDate.toISOString(),
+        koreaTimeISO: koreaTime.toISOString(),
+        selectedDateLocal: selectedDate.toLocaleDateString('ko-KR')
+      });
+
+      try {
+        // 날짜 필터링과 함께 스크랩 데이터 가져오기
+        const response = await fetch(`/api/widgets/scrap/list/${userId}?date=${selectedDateString}`);
+        if (!response.ok) {
+          console.error('스크랩 데이터를 가져오는 데 실패했습니다.');
+          return;
+        }
+
+        const scrapData = await response.json();
+        console.log('📌 스크랩 데이터 조회 결과:', {
+          selectedDate: selectedDateString,
+          userId: userId,
+          scrapData: scrapData,
+          count: scrapData?.length || 0
+        });
+
+        if (scrapData && Array.isArray(scrapData)) {
+          const formatted: DraggedItem[] = scrapData.map((scrap: any) => {
+            // 카테고리별 아이콘 설정
+            let icon = '📌';
+            switch (scrap.category) {
+              case 'weather':
+                icon = '🌤️';
+                break;
+              case 'advice':
+                icon = '💭';
+                break;
+              case 'book':
+                icon = '📚';
+                break;
+              case 'news':
+                icon = '📰';
+                break;
+              case 'randomdog':
+                icon = '🐕';
+                break;
+              case 'cat':
+                icon = '🐱';
+                break;
+              case 'music':
+                icon = '🎵';
+                break;
+              case 'stock':
+                icon = '📈';
+                break;
+              case 'nasa':
+                icon = '🚀';
+                break;
+              default:
+                icon = '📌';
+            }
+
+            return {
+              id: `scrap-${scrap.id}`,
+              type: 'widget',
+              title: `${icon} ${scrap.category} 스크랩`,
+              content: scrap.content || '스크랩된 내용',
+            };
+          });
+          setScrapItems(formatted);
+        }
+      } catch (error) {
+        console.error('스크랩 데이터 불러오기 실패:', error);
+      }
+    };
   
     fetchChromeLogs();
+    fetchScrapItems();
   }, [selectedDate]);
+
 
   // 크롬 로그 클릭 핸들러 - cards DB에 저장
   const handleChromeLogClick = async (item: DraggedItem) => {
@@ -304,6 +394,17 @@ export default function WriteDiary() {
     } catch (error) {
       console.error('크롬 로그 카드 저장 중 오류:', error);
     }
+=======
+  // 컴포넌트 마운트 시 일기 데이터 가져오기
+  useEffect(() => {
+    setMounted(true);
+    fetchDiaries();
+  }, []);
+  
+  // 오늘 날짜인지 확인하는 함수
+  const isToday = (date: Date) => {
+    return date.toDateString() === today.toDateString();
+
   };
 
   // 사진 카드 클릭 핸들러 - cards DB에 저장
@@ -467,6 +568,7 @@ export default function WriteDiary() {
       console.error('일기 업데이트 중 오류:', error);
     }
 
+
     // RL 모델에 피드백 전송
     if (aiSuggestedLayout) {
       try {
@@ -520,6 +622,95 @@ export default function WriteDiary() {
     } else {
       console.log('⚠️ AI 레이아웃이 없어서 RL 피드백을 전송하지 않습니다.');
     }
+=======
+    // 4. DB에 일기 저장
+    const dateString = selectedDate.toISOString().split('T')[0];
+    
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        alert('사용자 정보를 가져올 수 없습니다.');
+        return;
+      }
+
+      const userId = userData.user.id;
+      
+      // mood_vector 계산 (간단한 감정 분석 결과를 2D 벡터로 변환)
+      let moodVector = [0, 0]; // 기본값
+      if (sentimentResult) {
+        if (sentimentResult.label === 'positive') {
+          moodVector = [0.7, 0.4]; // 긍정적, 중간 각성
+        } else if (sentimentResult.label === 'negative') {
+          moodVector = [-0.5, 0.3]; // 부정적, 중간 각성
+        } else {
+          moodVector = [0.1, 0.1]; // 중립적, 낮은 각성
+        }
+      }
+
+      // DB에 저장할 데이터
+      const diaryData = {
+        user_id: userId,
+        date: dateString,
+        status: 'completed',
+        mood_vector: moodVector,
+        final_text: diaryText,
+        agent_version: 'v1.0'
+      };
+
+      // 기존 일기가 있는지 확인
+      const { data: existingDiary } = await supabase
+        .from('diaries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', dateString)
+        .single();
+
+      let result;
+      if (existingDiary) {
+        // 기존 일기 업데이트
+        result = await supabase
+          .from('diaries')
+          .update(diaryData)
+          .eq('id', existingDiary.id);
+      } else {
+        // 새 일기 생성
+        result = await supabase
+          .from('diaries')
+          .insert(diaryData);
+      }
+
+      if (result.error) {
+        console.error('일기 저장 실패:', result.error);
+        alert('일기 저장에 실패했습니다.');
+        return;
+      }
+
+      console.log('✅ 일기 저장 완료:', dateString);
+      
+      // 로컬 상태 업데이트
+      setDiaries((prev) => {
+        const exists = prev.some((d) => d.date === dateString);
+        if (exists) {
+          return prev.map((d) =>
+            d.date === dateString ? { ...d, mood: moodEmoji, hasEntry: true, content: diaryText } : d
+          );
+        } else {
+          return [...prev, { date: dateString, mood: moodEmoji, hasEntry: true, content: diaryText }];
+        }
+      });
+
+    } catch (error) {
+      console.error('일기 저장 중 오류:', error);
+      alert('일기 저장에 실패했습니다.');
+      return;
+    }
+    
+    // 5. 상태 초기화
+    setAiSuggestedLayout(null);
+    setLayoutApplied(false);
+    setViewMode('calendar');
+  };
+
 
     alert('일기가 저장되었습니다!');
     
@@ -921,6 +1112,7 @@ export default function WriteDiary() {
             </div>
           </header>
 
+
           {/* 일기 작성 뷰 */}
           <div className="max-w-6xl mx-auto">
             {/* 헤더 */}
@@ -965,6 +1157,8 @@ export default function WriteDiary() {
                         : `${selectedDate.toLocaleDateString('ko-KR')}의 크롬 로그가 없습니다.`}
                     </p>
                   )}
+=======
+
                 </div>
               </div>
 
@@ -989,6 +1183,7 @@ export default function WriteDiary() {
                     </div>
                   </label>
                 </div>
+
 
                 {/* 추가된 사진 목록 */}
                 <div className="space-y-3 mb-6">
@@ -1029,6 +1224,73 @@ export default function WriteDiary() {
                         >
                           🗑️
                         </button>
+=======
+              ) : (
+                /* 작성 모드 */
+                <div className="flex gap-7">
+                  {/* 첫 번째 칸: 위젯 스크랩과 크롬 로그 */}
+                  <div className="w-1/4 space-y-6">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
+                      <h3 className="text-xl font-semibold mb-4">📌 위젯 스크랩</h3>
+                      <div className="space-y-3">
+                        {scrapItems.length > 0 ? (
+                          scrapItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="bg-blue-50 p-3 rounded-lg border border-blue-200 cursor-move hover:bg-blue-100 transition-colors"
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, item)}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm break-words" title={item.title}>
+                                  {item.title}
+                                </p>
+                                <p className="text-xs text-gray-600 break-words mt-1" title={item.content}>
+                                  {item.content}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-gray-500 text-sm">
+                              {selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] 
+                                ? '오늘 스크랩한 위젯이 없습니다.' 
+                                : `${selectedDate.toLocaleDateString('ko-KR')}에 스크랩한 위젯이 없습니다.`}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              대시보드에서 위젯을 스크랩하면 여기에 표시됩니다.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 크롬 로그 */}
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
+                      <h3 className="text-xl font-semibold mb-4">🌐 크롬 로그</h3>
+                      <div className="space-y-2">
+                        {chromeLogs.length > 0 ? (
+                          chromeLogs.map((item) => (
+                            <div
+                              key={item.id}
+                              className="bg-gray-50 p-2 rounded border border-gray-200 cursor-move hover:bg-gray-100 transition-colors"
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, item)}
+                            >
+                              <p className="text-sm font-medium truncate" title={item.title}>{item.title}</p>
+                              <p className="text-xs text-gray-500 truncate">{item.content.split('\n')[1]}</p>
+                              <p className="text-xs text-gray-600 font-semibold">{item.content.split('\n')[2]}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500 text-sm">
+                            {selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] 
+                              ? '오늘의 크롬 로그를 불러오는 중이거나 데이터가 없습니다.' 
+                              : `${selectedDate.toLocaleDateString('ko-KR')}의 크롬 로그가 없습니다.`}
+                          </p>
+                        )}
+
                       </div>
                     </div>
                   ))}

@@ -239,68 +239,58 @@ async def learn_from_feedback(request: FeedbackRequest):
         print(f"📋 상세 에러: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"피드백 학습 실패: {str(e)}")
 
+class BatchTrainingRequest(BaseModel):
+    feedback_data: List[Dict[str, Any]]
+    training_config: Optional[Dict[str, Any]] = None
+
 @router.post("/batch-train")
-async def batch_train():
+async def batch_train(request: BatchTrainingRequest):
     """
-    DB에서 과거 데이터를 불러와서 배치 학습을 수행합니다.
+    프론트엔드에서 수집된 피드백 데이터로 배치 학습을 수행합니다.
     """
     try:
-        print("🔄 배치 학습 시작...")
+        print(f"🔄 배치 학습 시작... 피드백 데이터: {len(request.feedback_data)}개")
         
-        # 1. 과거 보상 로그 조회
-        try:
-            reward_logs_response = supabase.table('reward_logs').select('*').order('created_at', desc=True).limit(100).execute()
-            historical_rewards = reward_logs_response.data if reward_logs_response.data else []
-            print(f"📊 과거 보상 데이터 조회: {len(historical_rewards)}개")
-        except Exception as e:
-            print(f"❌ 보상 로그 조회 실패: {e}")
-            historical_rewards = []
+        if not request.feedback_data:
+            return {"success": False, "message": "학습할 피드백 데이터가 없습니다."}
         
-        # 2. 과거 레이아웃 로그 조회
-        try:
-            layout_logs_response = supabase.table('layout_logs').select('*').order('created_at', desc=True).limit(100).execute()
-            historical_layouts = layout_logs_response.data if layout_logs_response.data else []
-            print(f"📊 과거 레이아웃 데이터 조회: {len(historical_layouts)}개")
-        except Exception as e:
-            print(f"❌ 레이아웃 로그 조회 실패: {e}")
-            historical_layouts = []
-        
-        if not historical_rewards and not historical_layouts:
-            return {"success": False, "message": "학습할 과거 데이터가 없습니다."}
-        
-        # 3. 학습 에피소드 구성
+        # 1. 피드백 데이터를 학습 에피소드로 변환
         training_episodes = []
         
-        for reward_log in historical_rewards:
-            # 해당하는 레이아웃 로그 찾기 (같은 diary_id)
-            matching_layouts = [
-                layout for layout in historical_layouts 
-                if layout.get('diary_id') == reward_log.get('diary_id')
-            ]
-            
-            if matching_layouts:
+        for feedback in request.feedback_data:
+            try:
+                details = feedback.get('details', {})
+                user_layout = details.get('user_layout', {})
+                original_layout = details.get('original_layout', {})
+                reward = details.get('layout_reward', 0)
+                
                 # 레이아웃 데이터 구성
                 layout_data = {}
-                for layout_log in matching_layouts:
-                    card_id = layout_log.get('card_id')
-                    if card_id:
-                        layout_data[card_id] = {
-                            'row': layout_log.get('new_row', 0),
-                            'col': layout_log.get('new_col', 0),
-                            'order_index': 0
-                        }
+                for card_id, pos in user_layout.items():
+                    layout_data[card_id] = {
+                        'row': pos.get('row', 0),
+                        'col': pos.get('col', 0),
+                        'order_index': 0
+                    }
                 
                 episode = {
-                    'diary_id': reward_log.get('diary_id'),
-                    'reward': reward_log.get('reward_value', 0),
-                    'feedback_type': reward_log.get('reward_type'),
-                    'layout_data': layout_data
+                    'diary_id': feedback.get('diary_id'),
+                    'reward': reward,
+                    'feedback_type': feedback.get('feedback_type'),
+                    'layout_data': layout_data,
+                    'user_id': details.get('user_id'),
+                    'original_layout': original_layout,
+                    'user_layout': user_layout
                 }
                 training_episodes.append(episode)
+                
+            except Exception as e:
+                print(f"⚠️ 피드백 데이터 처리 실패: {e}")
+                continue
         
         print(f"🎯 구성된 학습 에피소드: {len(training_episodes)}개")
         
-        # 4. 배치 학습 수행
+        # 2. 배치 학습 수행
         if training_episodes:
             states = []
             rewards = []
@@ -308,18 +298,17 @@ async def batch_train():
             for episode in training_episodes:
                 try:
                     # 에피소드 데이터로 환경 초기화
-                    # user_id는 임시로 생성 (실제로는 reward_log에서 가져와야 함)
-                    temp_user_id = generate_uuid()
+                    user_id = episode.get('user_id', generate_uuid())
                     
                     initial_state = rl_env.reset(
-                        user_id=temp_user_id,
+                        user_id=user_id,
                         selected_card_ids=list(episode['layout_data'].keys()),
                         all_cards_data_raw=episode['layout_data'],
                         user_profile_data_raw={'average_satisfaction': 0.7, 'total_diaries': 5}
                     )
                     
                     # 보상 계산
-                    reward = rl_env.calculate_reward(episode['feedback_type'], {})
+                    reward = episode['reward']
                     
                     states.append(initial_state)
                     rewards.append(reward)
@@ -331,30 +320,32 @@ async def batch_train():
             # 배치 학습 수행
             if states and rewards:
                 try:
+                    # 학습 설정 적용
+                    training_config = request.training_config or {}
+                    learning_rate = training_config.get('learning_rate', 0.001)
+                    epochs = training_config.get('epochs', 3)
+                    
                     avg_loss = ppo_model.simple_update(states, rewards)
                     print(f"✅ 배치 학습 완료: {len(states)}개 에피소드, 평균 손실: {avg_loss:.4f}")
+                    
+                    # 모델 저장
+                    ppo_model.save_model(model_path)
+                    print(f"💾 모델 저장 완료: {model_path}")
+                    
+                    return {
+                        "success": True, 
+                        "message": f"배치 학습 완료! {len(states)}개 에피소드 처리됨",
+                        "avg_loss": avg_loss,
+                        "processed_episodes": len(states)
+                    }
+                    
                 except Exception as e:
                     print(f"❌ 배치 학습 실패: {e}")
-                    avg_loss = 0.0
+                    return {"success": False, "message": f"배치 학습 실패: {str(e)}"}
             else:
-                avg_loss = 0.0
-            
-            # 5. 모델 저장
-            try:
-                ppo_model.save_model(model_path)
-                print(f"💾 배치 학습 후 모델 저장 완료")
-            except Exception as e:
-                print(f"❌ 모델 저장 실패: {e}")
-            
-            return {
-                "success": True, 
-                "message": f"배치 학습 완료: {len(training_episodes)}개 에피소드 처리",
-                "episodes_processed": len(training_episodes),
-                "updates_performed": len(states),
-                "average_loss": round(avg_loss, 4)
-            }
+                return {"success": False, "message": "유효한 학습 데이터가 없습니다."}
         else:
-            return {"success": False, "message": "유효한 학습 에피소드를 구성할 수 없습니다."}
+            return {"success": False, "message": "처리할 수 있는 에피소드가 없습니다."}
             
     except Exception as e:
         import traceback

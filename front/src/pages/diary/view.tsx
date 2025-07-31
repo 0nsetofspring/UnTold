@@ -40,12 +40,19 @@ export default function DiaryView() {
   const [isLoading, setIsLoading] = useState(true);
   const [aiLayout, setAiLayout] = useState<any>(null);
 
+  // 한국 시간으로 날짜 문자열 생성
+  const getKoreanDateString = (date: Date) => {
+    const koreanTime = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+    return koreanTime.toISOString().split('T')[0];
+  };
+
   // URL 파라미터에서 날짜 가져오기
   useEffect(() => {
     if (router.isReady) {
       const { date } = router.query;
       if (date && typeof date === 'string') {
         const parsedDate = new Date(date);
+        console.log(`📅 view URL에서 날짜 파싱: ${date} → ${parsedDate.toISOString()}`);
         setSelectedDate(parsedDate);
       }
     }
@@ -64,7 +71,9 @@ export default function DiaryView() {
           return;
         }
 
-        const dateString = selectedDate.toISOString().split('T')[0];
+        const dateString = getKoreanDateString(selectedDate);
+        console.log(`📅 view 일기 데이터 로드: ${selectedDate.toISOString()} → ${dateString}`);
+        console.log(`📅 사용자 ID: ${userData.user.id}`);
 
         // 일기 데이터 가져오기
         const { data: diaryData, error: diaryError } = await supabase
@@ -74,6 +83,8 @@ export default function DiaryView() {
           .eq('date', dateString)
           .maybeSingle();
 
+        console.log(`📅 일기 조회 결과:`, diaryData ? '찾음' : '없음', diaryError);
+
         if (diaryError) {
           console.error('일기 데이터 로드 실패:', diaryError);
           return;
@@ -82,12 +93,13 @@ export default function DiaryView() {
         if (diaryData) {
           setDiary(diaryData);
           
-          // 카드 데이터 가져오기
+          // 카드 데이터 가져오기 (사용자 레이아웃 순서대로)
           const { data: cardsData, error: cardsError } = await supabase
             .from('cards')
             .select('*')
             .eq('diary_id', diaryData.id)
-            .order('order_index', { ascending: true });
+            .order('row', { ascending: true })
+            .order('col', { ascending: true });
 
           if (!cardsError && cardsData) {
             setCards(cardsData);
@@ -139,29 +151,45 @@ export default function DiaryView() {
               key={`${rowIndex}-${colIndex}`}
               className={`
                 aspect-square border-2 rounded-lg p-2 flex items-center justify-center text-xs
-                ${cell ? 'border-blue-400 bg-white shadow-sm' : 'border-gray-200 bg-gray-100'}
+                ${cell ? 'border-blue-400 bg-white shadow-sm' : 'border-gray-200 bg-white'}
               `}
             >
               {cell ? (
                 <div className="text-center w-full">
                   <div className="font-medium text-blue-800 truncate text-xs">
-                    {cards.find(c => c.id === cell.cardId)?.text_final || '제목 없음'}
+                    {(() => {
+                      const card = cards.find(c => c.id === cell.cardId);
+                      if (!card) return '제목 없음';
+                      
+                      // 사용자 업로드 이미지의 경우 제목을 간단하게 표시
+                      if (card.source_type === 'custom') {
+                        return '사용자 이미지';
+                      }
+                      
+                      return card.text_final || '제목 없음';
+                    })()}
                   </div>
                   <div className="text-gray-500 text-xs mt-1">
-                    {cards.find(c => c.id === cell.cardId)?.source_type || 'unknown'}
+                    {(() => {
+                      const sourceType = cards.find(c => c.id === cell.cardId)?.source_type;
+                      if (sourceType === 'custom') return '사용자 업로드';
+                      if (sourceType === 'chrome') return '브라우징';
+                      if (sourceType === 'widget') return '위젯';
+                      return sourceType || 'unknown';
+                    })()}
                   </div>
                   {cards.find(c => c.id === cell.cardId)?.image_url && (
                     <div className="mt-1">
                       <img
                         src={cards.find(c => c.id === cell.cardId)?.image_url}
                         alt="카드 이미지"
-                        className="w-8 h-8 object-cover rounded mx-auto"
+                        className="w-12 h-12 object-cover rounded mx-auto"
                       />
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-gray-400 text-xs">빈칸</div>
+                <div className="text-gray-400 text-xs"></div>
               )}
             </div>
           ))
@@ -270,21 +298,34 @@ export default function DiaryView() {
 
           {/* 일기 내용 */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📝 일기 내용</h2>
-            <div className="bg-gray-50 p-6 rounded-lg">
+            <h2 className="text-xl font-semibold mb-4">📝 LoRA 생성 일기 내용</h2>
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-lg border-l-4 border-purple-400">
+              <div className="flex items-center mb-3">
+                <span className="text-purple-600 mr-2">🤖</span>
+                <span className="text-sm font-medium text-purple-700">AI가 개인화하여 생성한 텍스트</span>
+              </div>
               <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
                 {diary.final_text}
               </p>
             </div>
           </div>
 
-          {/* AI 레이아웃 배치 */}
+          {/* 사용자 레이아웃 배치 */}
           {cards.length > 0 && (
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🎯 AI 레이아웃 배치</h2>
+              <h2 className="text-xl font-semibold mb-4">🎯 사용자 드래그앤드롭 레이아웃</h2>
               <p className="text-gray-600 mb-4">
-                AI가 추천한 최적의 레이아웃으로 카드들이 배치되었습니다.
+                사용자가 드래그 앤 드롭으로 직접 수정한 카드들의 최종 위치입니다.
               </p>
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border-l-4 border-green-400 mb-4">
+                <div className="flex items-center mb-2">
+                  <span className="text-green-600 mr-2">👆</span>
+                  <span className="text-sm font-medium text-green-700">사용자가 직접 배치한 위치</span>
+                </div>
+                <p className="text-xs text-green-600">
+                  각 카드를 드래그하여 원하는 위치에 배치한 결과입니다.
+                </p>
+              </div>
               {renderAiLayoutGrid()}
             </div>
           )}

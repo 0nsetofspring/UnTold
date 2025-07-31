@@ -5,7 +5,7 @@ from datasets import load_dataset
 import torch
 
 # 모델 및 토크나이저 불러오기
-model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+model_name = "EleutherAI/polyglot-ko-1.3b" # 이 부분은 이미 수정하셨을 겁니다.
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # 패딩 토큰 설정 (필요시)
@@ -23,7 +23,9 @@ model = AutoModelForCausalLM.from_pretrained(
 lora_config = LoraConfig(
     r=8, # LoRA 랭크(숫자가 작을수록 메모리 효율적, 표현력 떨어짐)
     lora_alpha=32, # loRA 가중치를 얼마나 크게 적용할지지
-    target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    # --- 이 부분이 변경되어야 합니다! ---
+    target_modules=["query_key_value", "dense"], # Polyglot-ko 모델에 맞는 모듈 이름으로 변경
+    # --- 여기까지 변경 ---
     lora_dropout=0.05, #과적합 방지 정도
     bias="none",
     task_type="CAUSAL_LM"
@@ -42,7 +44,7 @@ dataset = load_dataset("json", data_files="data/user_diaries.jsonl")["train"]
 def preprocess_function(examples):
     tokenized_input = tokenizer(
         examples["text"],
-        max_length=tokenizer.model_max_length, 
+        max_length=2048, 
         truncation=True,
         padding="max_length" 
     )

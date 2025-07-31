@@ -84,8 +84,13 @@ async def log_url(data: ChromeLogData):
         if data.visitStartTime:
             print(f"  - 방문 시작 시간: {datetime.fromtimestamp(data.visitStartTime/1000).strftime('%H:%M:%S')}")
 
-        # 사용자 ID 처리 (임시로 테스트용 UUID 사용)
-        user_id = data.user_id or "980081c4-b1f4-45d5-b14a-cf82a7f166e5"  # 테스트용 UUID
+        # 사용자 ID 처리
+        user_id = data.user_id
+        if not user_id:
+            print("⚠️ 사용자 ID가 제공되지 않았습니다. 기본값 사용")
+            user_id = "980081c4-b1f4-45d5-b14a-cf82a7f166e5"  # 기본값
+        else:
+            print(f"✅ 사용자 ID 사용: {user_id}")
 
         # Supabase에 저장할 데이터 준비 (특수문자 제거 및 중첩 딕셔너리 처리)
         # site_specific_data는 Supabase의 'jsonb' 컬럼 타입에 맞춰 딕셔너리 형태로 전달합니다.

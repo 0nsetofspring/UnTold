@@ -1,169 +1,223 @@
-# 📑 Untold
+# UnTold - 나도 몰랐던 나를 아는 방법
 
-**나도 몰랐던 나를 아는 방법**
+## 📖 프로젝트 개요
 
-하나의 웹 탭에서 **아침 대시보드**(정보·감정 추천)와 **밤 자동 일기**(OCR·AI 초안)를 제공하는 올‑인‑원 서비스
+UnTold은 사용자의 일상적인 디지털 활동(웹 브라우징, 위젯 사용, 일기 작성)을 통합하여 개인화된 일기 생성과 감정 분석을 제공하는 AI 기반 일기 플랫폼입니다.
 
-## 🚀 기술 스택
+<br><br>
 
-### Frontend
-- **React.js / Next.js** - SPA 기반, 서버사이드 렌더링(SSR)
-- **TypeScript** - 정적 타입을 통한 안정성 확보
-- **Tailwind CSS** - 유틸리티 기반 CSS 프레임워크
-- **Axios** - 백엔드 API와의 데이터 통신
-- **Supabase** - 인증 및 데이터베이스 서비스
+## 🎯 개발 동기
 
-### Backend
-- **FastAPI (Python)** - 빠르고 모던한 Python 기반 웹 프레임워크
-- **SQLAlchemy** - ORM
-- **Alembic** - DB 구조 변경 관리
-- **Supabase** - PostgreSQL 기반 백엔드 서비스
-- **Hugging Face Transformers** - 2D 감정 분석 모델
+### 문제 인식
+- **일기 작성의 어려움**: 많은 사람들이 일기를 쓰고 싶지만 시작하기 어렵거나 지속하기 어려워함
+- **디지털 흔적의 방치**: 브라우징 기록, 관심사 등이 체계적으로 정리되지 않음
+- **감정 인식의 부족**: 자신의 감정 상태를 객관적으로 파악하기 어려움
+- **개인화 부족**: 기존 일기 앱들은 개인별 특성을 고려하지 않는 일반적인 기능 제공
 
-### Machine Learning
-- **2D 감정 분석 모델** - Valence & Arousal 기반 감정 분류
-- **KoBERT** - 한국어 감정 분석
-- **Sentence Transformers** - 다국어 텍스트 임베딩
+### 해결 방향
+- **자동화된 일기 생성**: 사용자의 디지털 활동을 기반으로 일기 초안 자동 생성
+- **감정 분석 통합**: Russell의 2D 감정 모델을 활용한 정확한 감정 상태 매핑
+- **개인화된 경험**: 강화학습을 통한 사용자 맞춤형 레이아웃 제안
+- **직관적인 인터페이스**: 드래그 앤 드롭 방식의 쉬운 일기 편집
 
-## 📁 프로젝트 구조
+<br><br>
 
-```
-UnTold/
-├── back/                      # 백엔드 (FastAPI + ML)
-│   ├── main.py               # FastAPI 앱 진입점
-│   ├── api/                  # API 라우터
-│   │   ├── widget/          # 위젯 관련 API
-│   │   └── ml_router.py     # ML API
-│   ├── db/                   # 데이터베이스 관련
-│   ├── ml/                   # 머신러닝 모듈
-│   │   ├── emotion_classifier.py  # 2D 감정 분석
-│   │   └── best_emotion_regressor/ # 훈련된 모델
-│   ├── rl/                   # 강화학습 모듈
-│   ├── scripts/              # 유틸리티 스크립트
-│   ├── test_emotion_model.py # 모델 테스트 코드
-│   ├── test_emotion_curl.sh  # curl 테스트 스크립트
-│   ├── .env                  # 환경변수
-│   └── requirements.txt      # Python 의존성
-├── front/                    # 프론트엔드 (Next.js)
-│   ├── src/
-│   │   ├── pages/           # 페이지 컴포넌트
-│   │   │   ├── index.tsx    # 스플래시/로그인 페이지
-│   │   │   ├── dashboard/   # 대시보드
-│   │   │   └── widget-store/ # 위젯 스토어
-│   │   ├── components/      # 재사용 컴포넌트
-│   │   │   └── widget/      # 위젯 컴포넌트들
-│   │   ├── api/            # API 통신
-│   │   └── styles/         # 스타일 파일
-│   └── package.json        # Node.js 의존성
-├── extension/               # 크롬 익스텐션
-└── docs/                    # 문서
-    └── proposal.md          # 기획서
-```
+## 👥 타겟 사용자
 
-## 🛠️ 개발 환경 설정
+### 주요 대상
+- **일기 작성에 관심이 있는 모든 연령대**: 20-40대 주 타겟
+- **디지털 네이티브**: 온라인 활동이 많은 사용자
+- **자기 성찰에 관심 있는 사용자**: 감정 상태 파악과 개인 성장에 관심
 
-### 백엔드 설정
 
-1. Python 가상환경 생성 및 활성화
-```bash
-cd back
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-```
+<br><br>
 
-2. 의존성 설치
-```bash
-pip install -r requirements.txt
-```
-
-3. 환경변수 설정
-```bash
-# back/.env 파일 생성
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_KEY=your_supabase_service_key
-```
-
-4. 서버 실행
-```bash
-python main.py
-```
-
-### 프론트엔드 설정
-
-1. 의존성 설치
-```bash
-cd front
-npm install
-```
-
-2. 환경변수 설정
-```bash
-# front/.env.local 파일 생성
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-3. 개발 서버 실행
-```bash
-npm run dev
-```
-
-## 🌟 주요 기능
+## 🚀 주요 기능
 
 ### 🔐 인증 시스템
-- **카카오 로그인** - OAuth 기반 소셜 로그인
-- **Google 로그인** - OAuth 기반 소셜 로그인  
-- **GitHub 로그인** - OAuth 기반 소셜 로그인
-- **Supabase Auth** - 사용자 관리 및 세션 관리
+- **카카오 로그인**: OAuth 기반 소셜 로그인
+- **Google 로그인**: OAuth 기반 소셜 로그인
+- **GitHub 로그인**: OAuth 기반 소셜 로그인
 
 ### 📊 아침 대시보드
-- **날씨 위젯** - 실시간 날씨 정보
-- **뉴스 위젯** - 최신 뉴스 헤드라인
-- **NASA 위젯** - 우주 사진 및 정보
-- **명언 위젯** - 일일 명언
-- **주식 위젯** - 실시간 주식 정보
-- **음악 위젯** - 추천 음악
-- **고양이 위젯** - 귀여운 고양이 사진
-- **강아지 위젯** - 랜덤 강아지 사진
-- **책 추천 위젯** - 개인화된 책 추천
+- **날씨 위젯**: 실시간 날씨 정보 및 체감 온도
+- **뉴스 위젯**: 최신 뉴스 헤드라인 및 썸네일
+- **NASA 위젯**: 우주 사진 및 천문학 정보
+- **명언 위젯**: 랜덤 한국어 명언
+- **주식 위젯**: 실시간 주식 정보 및 변동률
+- **음악 위젯**: 추천 음악 플레이리스트
+- **고양이 위젯**: 랜덤 고양이 사진
+- **강아지 위젯**: 랜덤 강아지 사진
+- **책 추천 위젯**: 개인화된 책 추천 
 
-### 🧠 2D 감정 분석
-- **Valence (긍정성)** - -1 ~ 1 (부정적 ~ 긍정적)
-- **Arousal (활성도)** - -1 ~ 1 (낮은 활성도 ~ 높은 활성도)
-- **7가지 감정 레이블**: excited, calm, pleasant, angry, sad, unpleasant, tense, relaxed, neutral
-- **높은 정확도**: 57-81% 신뢰도
 
 ### 📝 자동 일기 생성
-- **AI 기반 초안 생성** - 사용자 감정 기반 맞춤형 일기
-- **강화학습 개선** - 사용자 피드백 기반 모델 개선
-- **OCR 기능** - 이미지에서 텍스트 추출
+- **AI 기반 초안 생성**: 사용자 감정 기반 맞춤형 일기
+- **강화학습 개선**: 사용자 피드백 기반 모델 개선
+- **멀티모달 통합**: 브라우징 로그, 위젯 스크랩, 사용자 입력 통합
 
-### 🛍️ 위젯 마켓
-- **사용자 맞춤형 위젯** - 개인화된 위젯 선택
-- **드래그 앤 드롭** - 직관적인 위젯 배치
-- **실시간 저장** - 사용자 설정 자동 저장
+### 🔄 통합 데이터 수집
+- **Chrome Extension**: 브라우징 활동 자동 수집 및 분석
+- **위젯 스크랩**: 관심 있는 정보를 일기 소재로 활용
+- **사용자 입력**: 직접적인 일기 텍스트 작성 및 사진 업로드
 
-## 🧪 테스트
+### 🧠 개인화 및 학습
+- **사용자 피드백 학습**: 사용자의 수정 패턴을 학습하여 개선
+- **감정 트렌드 분석**: 시간에 따른 감정 변화 추적 및 시각화
+- **맞춤형 추천**: 개인별 관심사와 패턴 기반 콘텐츠 추천
+- **MyPage 대시보드**: 개인 활동 통계 및 스크랩 관리
 
-### 모델 테스트
-```bash
-# Python 테스트 실행
-cd back
-python test_emotion_model.py
+### 🎨 직관적인 편집 인터페이스
+- **카드 기반 편집**: 드래그 앤 드롭 방식의 직관적인 일기 편집
+- **실시간 미리보기**: 변경사항을 즉시 확인 가능
+- **개인화된 레이아웃**: 강화학습 기반 사용자 맞춤형 레이아웃 제안
 
-# Curl 테스트 실행  
-cd back
-./test_emotion_curl.sh
+### 🧠 2D 감정 분석
+- **Valence (긍정성)**: -1 ~ 1 (부정적 ~ 긍정적)
+- **Arousal (활성도)**: -1 ~ 1 (낮은 활성도 ~ 높은 활성도)
+- **9가지 감정 레이블**: excited, calm, pleasant, angry, sad, unpleasant, tense, relaxed, neutral
+- **Russell 모델 기반**: 검증된 2차원 감정 분석
 
-# 개별 API 테스트
-curl -X POST "http://localhost:8000/api/ml/sentiment" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "오늘은 정말 행복한 하루였어요!"}'
+<br><br>
+
+## 🛠 사용 기술
+
+### Frontend
+- **Next.js 13**: React 기반 풀스택 프레임워크
+- **TypeScript**: 타입 안정성과 개발 생산성 향상
+- **Tailwind CSS**: CSS 프레임워크
+
+### Backend
+- **FastAPI**: Python 웹 프레임워크
+- **Uvicorn**: ASGI 서버
+- **Pydantic**: 데이터 검증 및 직렬화
+
+### Database
+- **Supabase**: PostgreSQL 기반 백엔드 서비스
+
+
+<br><br>
+
+## 🧠 기술적 의도와 원리
+
+### 1. 2D 감정 분석 모델
+**Russell의 감정 모델**을 기반으로 한 2차원 감정 분석을 구현했습니다.
+
+#### 원리
+- **Valence (가치)**: -1 (부정적) ~ +1 (긍정적)
+- **Arousal (각성)**: -1 (낮은 각성) ~ +1 (높은 각성)
+
+#### 감정 매핑
+```
+Valence > 0.2:
+  Arousal > 0.2: excited (흥분)
+  Arousal < -0.2: calm (평온)
+  else: pleasant (즐거움)
+
+Valence < -0.2:
+  Arousal > 0.2: angry (분노)
+  Arousal < -0.2: sad (슬픔)
+  else: unpleasant (불쾌)
+
+else:
+  Arousal > 0.2: tense (긴장)
+  Arousal < -0.2: relaxed (이완)
+  else: neutral (중립)
+```
+<br>
+
+### 2. 강화학습 기반 레이아웃 최적화
+사용자의 피드백을 학습하여 개인화된 일기 레이아웃을 제안합니다.
+
+#### 상태 공간 (State Space)
+- 선택된 카드들의 특성
+- 이전 레이아웃 패턴
+
+#### 행동 공간 (Action Space)
+- 카드별 위치 배치 (row, col)
+- 카드 순서 결정
+- 레이아웃 스타일 선택
+
+#### 보상 함수 (Reward Function)
+- 사용자 만족도 (save: +100, modify: -20, regenerate: -50)
+- 레이아웃 일관성
+
+<br>
+
+### 3. 멀티모달 데이터 통합
+다양한 소스의 데이터를 통합하여 의미 있는 일기를 생성합니다.
+
+#### 데이터 소스
+1. **Chrome 브라우징 로그**: 방문한 웹사이트, 체류 시간
+2. **위젯 스크랩**: 날씨, 뉴스, 명언, 책 정보 등
+3. **사용자 직접 입력**: 일기 텍스트, 사진, 설명
+
+#### 통합 프로세스
+1. **데이터 전처리**: 정규화 및 클리닝
+2. **특성 추출**: 텍스트 임베딩, 메타데이터 분석
+3. **관련성 계산**: 사용자 관심사와의 연관성
+4. **일기 생성**: 통합된 정보를 바탕으로 일기 초안 생성
+
+ <br><br>
+
+## 🔄 시스템 파이프라인
+
+### 1. 데이터 수집 단계
+```
+Chrome Extension → Supabase (chrome_logs)
+Widget Scrap → Supabase (scraps)
+User Input → Frontend State
 ```
 
-### API 엔드포인트
-- `GET /health` - 서버 상태 확인
-- `GET /api/ml/test` - ML API 테스트
-- `POST /api/ml/sentiment` - 2D 감정 분석
-- `GET /api/widgets/user/{user_id}` - 사용자 위젯 조회
-- `POST /api/widgets/user/{user_id}` - 사용자 위젯 저장
+### 2. 일기 생성 단계
+```
+1. 데이터 통합
+   ↓
+2. 일기 초안 생성
+   ↓
+3. 레이아웃 제안 (RL Model)
+   ↓
+4. 사용자 편집
+   ↓
+5. 피드백 학습
+```
+<br><br>
+
+## 🤖 AI 모델 상세
+
+### 1. 감정 분석 모델
+- **기반 모델**: `intfloat/multilingual-e5-large-instruct`
+- **회귀 레이어**: 2차원 출력 (valence, arousal)
+- **활성화 함수**: Tanh (-1 ~ 1 범위)
+
+### 2. 강화학습 모델
+- **알고리즘**: PPO (Proximal Policy Optimization)
+- **네트워크 구조**: Actor-Critic
+- **배치 크기**: 64
+
+### 3. 텍스트 생성 모델
+- **학습 방식**: Low lank addaption
+- **생성 방식**: 템플릿 기반 + 조건부 생성
+- **개인화**: 사용자 스타일 학습
+
+<br><br>
+
+## 📊 데이터베이스 스키마
+
+### 핵심 테이블
+1. **users**: 사용자 정보
+2. **diaries**: 일기 메타데이터 및 감정 벡터
+3. **cards**: 일기 구성 요소 (위젯, 크롬 로그, 사진)
+4. **scraps**: 스크랩된 위젯 정보
+5. **chrome_logs**: 브라우징 활동 로그
+6. **layout_logs**: 레이아웃 변경 이력
+7. **reward_logs**: 사용자 피드백 및 보상
+
+<br>
+
+---
+
+
+<br>
+
+**UnTold** - 당신의 일상이 특별한 이야기가 되는 순간 ✨

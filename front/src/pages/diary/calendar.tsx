@@ -14,7 +14,8 @@ interface DiaryEntry {
 }
 
 export default function DiaryCalendar() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  // 현재 날짜를 7/31로 설정 (한국 시간 기준)
+  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 6, 31)); // 7월 31일
   const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -111,9 +112,9 @@ export default function DiaryCalendar() {
     
     console.log(`📅 날짜 클릭: ${date.toISOString()} → ${dateString}, 일기 존재: ${!!diary}`);
     
-    // 이미 완성된 일기가 있으면 보기 페이지로, 없으면 작성 페이지로
-    if (diary && diary.status === 'finalized') {
-      router.push(`/diary/view?date=${dateString}`);
+    // 일기가 있으면 view로, 없으면 생성 페이지로
+    if (diary) {
+      router.push(`/diary/view?date=${dateString}&diary_id=${diary.id}`);
     } else {
       router.push(`/diary?date=${dateString}`);
     }
@@ -128,13 +129,13 @@ export default function DiaryCalendar() {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  // 오늘 날짜인지 확인 (한국 시간 기준)
+  // 오늘 날짜인지 확인 (7/31로 고정)
   const isToday = (date: Date) => {
-    const today = new Date();
-    const koreanToday = new Date(today.getTime() + (9 * 60 * 60 * 1000));
+    const targetDate = new Date(2025, 6, 31); // 7월 31일
+    const koreanTargetDate = new Date(targetDate.getTime() + (9 * 60 * 60 * 1000));
     const koreanDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
     
-    return koreanDate.toDateString() === koreanToday.toDateString();
+    return koreanDate.toDateString() === koreanTargetDate.toDateString();
   };
 
   // 현재 월의 날짜인지 확인
@@ -158,21 +159,23 @@ export default function DiaryCalendar() {
     return '😐'; // 중립
   };
 
-  // 감정 벡터가 유효한지 확인하는 함수
+  // 감정 벡터가 유효한지 확인하는 함수 (항상 true 반환하여 감정구슬이 무조건 나오도록)
   const isValidEmotionVector = (moodVector: number[]): boolean => {
-    return moodVector && 
-           moodVector.length >= 2 && 
-           (moodVector[0] !== 0 || moodVector[1] !== 0) && 
-           moodVector[0] !== null && 
-           moodVector[1] !== null;
+    return true; // 항상 감정구슬이 나오도록 true 반환
   };
 
-  // 감정 벡터를 EmotionBead 형식으로 변환
+  // 감정 벡터를 EmotionBead 형식으로 변환 (기본값 제공)
   const convertToEmotionVector = (moodVector: number[]) => {
-    if (!isValidEmotionVector(moodVector)) return null;
+    if (!isValidEmotionVector(moodVector)) {
+      // 기본 감정 벡터 제공 (중립)
+      return {
+        x: 0, // Valence (중립)
+        y: 0  // Arousal (중립)
+      };
+    }
     return {
-      x: moodVector[0], // Valence
-      y: moodVector[1]  // Arousal
+      x: moodVector[0] || 0, // Valence
+      y: moodVector[1] || 0  // Arousal
     };
   };
 
@@ -282,23 +285,15 @@ export default function DiaryCalendar() {
                     `}
                   >
                     <div className="h-full flex flex-col items-center justify-center">
-                      {/* 일기 상태 */}
-                      {diary && isValidEmotionVector(diary.mood_vector) ? (
+                      {/* 일기 상태 - 감정구슬이 무조건 나오도록 수정 */}
+                      {diary ? (
                         <EmotionBead 
-                          emotionVector={convertToEmotionVector(diary.mood_vector)!} 
+                          emotionVector={convertToEmotionVector(diary.mood_vector)} 
                           size="md"
                           className="mx-auto"
                         >
                           {date.getDate()}
                         </EmotionBead>
-                      ) : diary && diary.status === 'finalized' ? (
-                        // finalized이지만 감정 벡터가 없는 경우 (기본 감정구슬)
-                        <div className="flex flex-col items-center">
-                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium">
-                            {date.getDate()}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">완료</div>
-                        </div>
                       ) : (
                         <>
                           {/* 날짜 */}

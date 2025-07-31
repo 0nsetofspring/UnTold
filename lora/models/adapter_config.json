@@ -25,9 +25,9 @@
     "rank_pattern": {},
     "revision": null,
     "target_modules": [
-      "dense_4h_to_h",
       "query_key_value",
       "dense",
+      "dense_4h_to_h",
       "dense_h_to_4h"
     ],
     "task_type": "CAUSAL_LM",

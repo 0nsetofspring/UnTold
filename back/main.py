@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.widget.router import router as widget_router
 from api.ml_router import router as ml_router
 from api.rl_router import router as rl_router
+from api.lora_router import router as lora_router
 from dotenv import load_dotenv
 # 크롬 익스텐션 API 라우터 추가
 from chrome.chrome_api.chrome_router import chrome_router
@@ -36,6 +37,7 @@ app.add_middleware(
 app.include_router(widget_router, prefix="/api")
 app.include_router(ml_router, prefix="/api")
 app.include_router(rl_router, prefix="/api")
+app.include_router(lora_router, prefix="/api")
 
 # 크롬 익스텐션 라우터 추가
 # - /api/log_url: 크롬 익스텐션에서 URL 로그를 받는 엔드포인트

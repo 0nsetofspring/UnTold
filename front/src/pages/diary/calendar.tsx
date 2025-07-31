@@ -36,8 +36,22 @@ export default function DiaryCalendar() {
     fetchDiaries();
   }, [currentMonth]);
 
+  // 페이지 포커스 시 데이터 새로고침
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 캘린더 페이지 포커스 - 데이터 새로고침');
+      fetchDiaries();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   const fetchDiaries = async () => {
     try {
+      setLoading(true);
+      console.log('🔄 일기 데이터 로드 시작...');
+      
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user) {
         console.error('사용자 정보를 가져올 수 없습니다.', userError);
@@ -46,6 +60,8 @@ export default function DiaryCalendar() {
 
       const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+
+      console.log(`📅 조회 범위: ${startOfMonth.toISOString().split('T')[0]} ~ ${endOfMonth.toISOString().split('T')[0]}`);
 
       const { data, error } = await supabase
         .from('diaries')
@@ -60,6 +76,13 @@ export default function DiaryCalendar() {
         return;
       }
 
+      console.log(`✅ 일기 데이터 로드 완료: ${data?.length || 0}개`);
+      if (data && data.length > 0) {
+        data.forEach(diary => {
+          console.log(`  - ${diary.date}: ${diary.status} (감정: ${diary.mood_vector})`);
+        });
+      }
+
       setDiaries(data || []);
     } catch (error) {
       console.error('일기 데이터 로드 중 오류:', error);
@@ -68,16 +91,25 @@ export default function DiaryCalendar() {
     }
   };
 
+  // 한국 시간으로 날짜 문자열 생성
+  const getKoreanDateString = (date: Date) => {
+    const koreanTime = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+    return koreanTime.toISOString().split('T')[0];
+  };
+
   // 특정 날짜의 일기 찾기
   const getDiaryForDate = (date: Date) => {
-    const dateString = date.toISOString().split('T')[0];
+    const dateString = getKoreanDateString(date);
+    console.log(`🔍 날짜 검색: ${date.toISOString()} → ${dateString}`);
     return diaries.find(diary => diary.date === dateString);
   };
 
   // 날짜 클릭 핸들러
   const handleDateClick = (date: Date) => {
-    const dateString = date.toISOString().split('T')[0];
+    const dateString = getKoreanDateString(date);
     const diary = getDiaryForDate(date);
+    
+    console.log(`📅 날짜 클릭: ${date.toISOString()} → ${dateString}, 일기 존재: ${!!diary}`);
     
     // 이미 완성된 일기가 있으면 보기 페이지로, 없으면 작성 페이지로
     if (diary && diary.status === 'finalized') {
@@ -96,10 +128,13 @@ export default function DiaryCalendar() {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  // 오늘 날짜인지 확인
+  // 오늘 날짜인지 확인 (한국 시간 기준)
   const isToday = (date: Date) => {
     const today = new Date();
-    return date.toDateString() === today.toDateString();
+    const koreanToday = new Date(today.getTime() + (9 * 60 * 60 * 1000));
+    const koreanDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+    
+    return koreanDate.toDateString() === koreanToday.toDateString();
   };
 
   // 현재 월의 날짜인지 확인
@@ -192,9 +227,19 @@ export default function DiaryCalendar() {
               ← 이전 달
             </button>
             
-            <h2 className="text-2xl font-bold text-gray-800">
-              {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
-            </h2>
+            <div className="flex items-center space-x-4">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+              </h2>
+              
+              <button
+                onClick={fetchDiaries}
+                className="p-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 transition-colors"
+                title="데이터 새로고침"
+              >
+                🔄 새로고침
+              </button>
+            </div>
             
             <button
               onClick={goToNextMonth}
@@ -238,7 +283,7 @@ export default function DiaryCalendar() {
                   >
                     <div className="h-full flex flex-col items-center justify-center">
                       {/* 일기 상태 */}
-                      {diary && diary.status === 'finalized' && isValidEmotionVector(diary.mood_vector) ? (
+                      {diary && isValidEmotionVector(diary.mood_vector) ? (
                         <EmotionBead 
                           emotionVector={convertToEmotionVector(diary.mood_vector)!} 
                           size="md"
@@ -246,23 +291,20 @@ export default function DiaryCalendar() {
                         >
                           {date.getDate()}
                         </EmotionBead>
+                      ) : diary && diary.status === 'finalized' ? (
+                        // finalized이지만 감정 벡터가 없는 경우 (기본 감정구슬)
+                        <div className="flex flex-col items-center">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium">
+                            {date.getDate()}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">완료</div>
+                        </div>
                       ) : (
                         <>
                           {/* 날짜 */}
                           <div className={`text-sm font-medium ${isTodayDate ? 'text-blue-600' : ''}`}>
                             {date.getDate()}
                           </div>
-                          
-                          {/* 일기 상태 */}
-                          {diary && (
-                            <div className="text-lg mt-1">
-                              {diary.status === 'finalized' ? (
-                                <span className="text-gray-400">📝</span>
-                              ) : (
-                                <span className="text-gray-500">📝</span>
-                              )}
-                            </div>
-                          )}
                         </>
                       )}
                     </div>

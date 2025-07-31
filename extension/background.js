@@ -69,6 +69,9 @@ async function sendToBackend(pageData) {
     try {
         console.log("📤 백엔드 서버로 데이터 전송 시작...");
         
+        // 사용자 ID는 프론트엔드에서 전달받거나 기본값 사용
+        let userId = pageData.user_id || null;
+        
         const response = await fetch('http://localhost:8000/api/log_url', {
             method: 'POST',
             headers: {
@@ -82,7 +85,8 @@ async function sendToBackend(pageData) {
                 pageType: pageData.pageType,
                 siteSpecific: pageData.siteSpecific,
                 visitStartTime: pageData.visitStartTime,
-                currentTime: pageData.currentTime
+                currentTime: pageData.currentTime,
+                user_id: userId
             })
         });
         

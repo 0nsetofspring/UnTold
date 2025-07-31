@@ -156,25 +156,7 @@ export default function Dashboard() {
                   <p className="text-gray-600 text-lg mt-1">{dateString}</p>
                 </div>
                 
-                {/* 감정 정보 */}
-                <div className="flex items-center space-x-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl px-4 py-3 border border-blue-100">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                    😊
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">오늘의 기분</p>
-                    <p className="text-base text-gray-800 font-semibold">평온함</p>
-                  </div>
-                </div>
 
-                {/* 추천 행동 */}
-                <div className="flex items-center space-x-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl px-4 py-3 border border-green-100">
-                  <span className="text-2xl">💡</span>
-                  <div>
-                    <p className="text-sm text-gray-600 font-medium">추천 행동</p>
-                    <p className="text-base text-gray-800 font-semibold">아침 산책하기</p>
-                  </div>
-                </div>
               </div>
 
               {/* 오른쪽: 시간과 인사말 */}

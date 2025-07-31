@@ -191,16 +191,19 @@ export default function WriteDiary() {
 
           if (error) {
             console.error('일기 생성 실패:', error);
+            alert('일기 초기화에 실패했습니다. 페이지를 새로고침해주세요.');
             return;
           }
 
           setCurrentDiaryId(diaryId);
+          console.log('✅ 새로운 일기 ID 생성:', diaryId);
         }
         
         fetchLearningStatus();
         
       } catch (error) {
         console.error('일기 초기화 중 오류:', error);
+        alert('일기 초기화 중 오류가 발생했습니다. 페이지를 새로고침해주세요.');
       }
     };
 
@@ -986,33 +989,41 @@ export default function WriteDiary() {
       return;
     }
 
+    if (!currentDiaryId) {
+      alert('일기 ID가 생성되지 않았습니다. 페이지를 새로고침해주세요.');
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
-      // 2D 감정 분석 API 호출
+      // 2D 감정 분석 API 호출 (선택적)
       setGenerationStep('감정 분석 중...');
-      const sentimentResult = await fetchSentiment(diaryText);
-
-      // 2D 감정 분석 결과 처리
       let finalMoodVector = [0, 0]; // 기본값
       
-      if (sentimentResult) {
-        // 2D 감정 분석 모델의 실제 결과 사용
-        const valence = sentimentResult.valence || 0;
-        const arousal = sentimentResult.arousal || 0;
-        const emotionLabel = sentimentResult.emotion_label || 'neutral';
+      try {
+        const sentimentResult = await fetchSentiment(diaryText);
         
-        // mood_vector에 실제 2D 좌표값 저장
-        finalMoodVector = [valence, arousal];
-        
-        console.log('🎭 2D 감정 분석 결과:', {
-          valence,
-          arousal,
-          emotionLabel,
-          finalMoodVector
-        });
-      } else {
-        console.log('⚠️ 감정 분석 결과가 없습니다.');
+        if (sentimentResult) {
+          // 2D 감정 분석 모델의 실제 결과 사용
+          const valence = sentimentResult.valence || 0;
+          const arousal = sentimentResult.arousal || 0;
+          const emotionLabel = sentimentResult.emotion_label || 'neutral';
+          
+          // mood_vector에 실제 2D 좌표값 저장
+          finalMoodVector = [valence, arousal];
+          
+          console.log('🎭 2D 감정 분석 결과:', {
+            valence,
+            arousal,
+            emotionLabel,
+            finalMoodVector
+          });
+        } else {
+          console.log('⚠️ 감정 분석 결과가 없습니다. 기본값 사용.');
+        }
+      } catch (error) {
+        console.log('⚠️ 감정 분석 API 호출 실패. 기본값 사용:', error);
       }
 
       // 레이아웃 차이 기반 보상 계산
@@ -1067,62 +1078,125 @@ export default function WriteDiary() {
       if (userLayout && Object.keys(userLayout).length > 0) {
         setGenerationStep('사용자 레이아웃 저장 중...');
         console.log('💾 사용자 레이아웃 저장 중...');
-        await saveUserLayoutToDatabase(userLayout);
+        try {
+          await saveUserLayoutToDatabase(userLayout);
+        } catch (error) {
+          console.error('⚠️ 사용자 레이아웃 저장 실패:', error);
+        }
       }
 
-      // LoRA 모델을 사용하여 개인화된 텍스트 생성
+      // LoRA 모델을 사용하여 개인화된 텍스트 생성 (선택적)
       setGenerationStep('LoRA 모델로 개인화된 텍스트 생성 중...');
       console.log('🤖 LoRA 모델을 통한 개인화된 텍스트 생성 중...');
-      const { data: currentUserData } = await supabase.auth.getUser();
-      const loraResponse = await fetch('http://localhost:8000/api/lora/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          original_text: diaryText,
-          user_id: currentUserData.user.id,
-          diary_id: currentDiaryId
-        })
-      });
-
+      
       let finalText = diaryText; // 기본값은 원본 텍스트
       let loraModelVersion = null;
 
-      if (loraResponse.ok) {
-        const loraResult = await loraResponse.json();
-        finalText = loraResult.generated_text;
-        loraModelVersion = loraResult.model_version;
-        console.log('✅ LoRA 텍스트 생성 완료:', {
-          original_length: loraResult.original_length,
-          generated_length: loraResult.generated_length,
-          model_version: loraResult.model_version
-        });
-      } else {
-        console.log('⚠️ LoRA 텍스트 생성 실패, 원본 텍스트 사용');
+      try {
+        const { data: currentUserData } = await supabase.auth.getUser();
+        if (currentUserData?.user) {
+          const loraResponse = await fetch('http://localhost:8000/api/lora/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              original_text: diaryText,
+              user_id: currentUserData.user.id,
+              diary_id: currentDiaryId
+            })
+          });
+
+          if (loraResponse.ok) {
+            const loraResult = await loraResponse.json();
+            finalText = loraResult.generated_text;
+            loraModelVersion = loraResult.model_version;
+            console.log('✅ LoRA 텍스트 생성 완료:', {
+              original_length: loraResult.original_length,
+              generated_length: loraResult.generated_length,
+              model_version: loraResult.model_version
+            });
+          } else {
+            console.log('⚠️ LoRA 텍스트 생성 실패, 원본 텍스트 사용');
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ LoRA API 호출 실패. 원본 텍스트 사용:', error);
       }
 
-      // diaries 테이블 업데이트
+      // diaries 테이블 업데이트 (핵심 기능)
       setGenerationStep('일기 데이터베이스에 저장 중...');
+      console.log('💾 일기 저장 시작:', {
+        diaryId: currentDiaryId,
+        finalTextLength: finalText.length,
+        moodVector: finalMoodVector
+      });
+      
       const { data, error } = await supabase
         .from('diaries')
         .update({
           status: 'finalized',
           mood_vector: finalMoodVector,
-          final_text: finalText, // LoRA 생성된 텍스트 사용
+          final_text: finalText, // LoRA 생성된 텍스트 또는 원본 텍스트
           updated_at: new Date().toISOString()
         })
         .eq('id', currentDiaryId)
         .select();
 
       if (error) {
-        console.error('일기 업데이트 실패:', error);
-        return;
+        console.error('❌ 일기 업데이트 실패:', error);
+        
+        // 일기 ID가 없거나 잘못된 경우 재생성 시도
+        if (error.code === 'PGRST116' || error.message?.includes('not found')) {
+          console.log('🔄 일기 ID 재생성 시도...');
+          try {
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user) {
+              const newDiaryId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+              });
+
+              const dateString = getKoreanDateString(selectedDate);
+              const diaryData = {
+                id: newDiaryId,
+                user_id: userData.user.id,
+                date: dateString,
+                status: 'finalized',
+                mood_vector: finalMoodVector,
+                final_text: finalText,
+                agent_version: 'v1.0'
+              };
+
+              const { data: newData, error: newError } = await supabase
+                .from('diaries')
+                .insert([diaryData])
+                .select();
+
+              if (newError) {
+                console.error('❌ 일기 재생성 실패:', newError);
+                alert('일기 저장에 실패했습니다. 다시 시도해주세요.');
+                return;
+              }
+
+              setCurrentDiaryId(newDiaryId);
+              console.log('✅ 일기 재생성 성공:', newDiaryId);
+            }
+          } catch (retryError) {
+            console.error('❌ 일기 재생성 중 오류:', retryError);
+            alert('일기 저장에 실패했습니다. 다시 시도해주세요.');
+            return;
+          }
+        } else {
+          alert('일기 저장에 실패했습니다. 다시 시도해주세요.');
+          return;
+        }
       }
 
       console.log('✅ 일기 업데이트 완료:', data);
       console.log('🎭 감정 벡터:', finalMoodVector);
       console.log('💰 레이아웃 보상:', layoutReward, '차이:', layoutDifference);
 
-      // RL 모델에 피드백 전송
+      // RL 모델에 피드백 전송 (선택적)
       if (aiSuggestedLayout) {
         setGenerationStep('강화학습 모델에 피드백 전송 중...');
         try {
@@ -1164,43 +1238,41 @@ export default function WriteDiary() {
         }
       }
 
-      // 일기 저장 후 LoRA 모델 온라인 학습 시작
-      setGenerationStep('LoRA 모델 온라인 학습 시작 중...');
-      try {
-        console.log('🔄 LoRA 모델 온라인 학습 시작...');
-        const { data: currentUserData } = await supabase.auth.getUser();
-        if (currentUserData?.user) {
-          const trainingResponse = await fetch('http://localhost:8000/api/lora/train', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: currentUserData.user.id,
-              force_retrain: false
-            })
-          });
+      // 일기 저장 후 LoRA 모델 온라인 학습 시작 (현재 비활성화)
+      setGenerationStep('LoRA 모델 온라인 학습 준비 중...');
+      console.log('🔄 LoRA 모델 온라인 학습은 현재 비활성화되어 있습니다.');
 
-          if (trainingResponse.ok) {
-            const trainingResult = await trainingResponse.json();
-            console.log('✅ LoRA 온라인 학습 시작:', trainingResult);
-          } else {
-            console.log('⚠️ LoRA 온라인 학습 시작 실패');
-          }
-        }
-      } catch (error) {
-        console.error('❌ LoRA 온라인 학습 중 오류:', error);
-      }
-
-      alert('일기가 생성되었습니다!');
-      // view 페이지로 이동하여 생성된 일기 확인
+      // 생성된 일기가 DB에 제대로 저장되었는지 확인
       const dateString = getKoreanDateString(selectedDate);
-      console.log('📅 view 페이지로 이동:', dateString);
+      
+      alert(`일기가 성공적으로 생성되었습니다!\n\n📅 날짜: ${dateString}\n🆔 일기 ID: ${currentDiaryId}\n📝 내용 길이: ${finalText.length}자\n\n잠시 후 일기 보기 페이지로 이동합니다.`);
+      console.log('📅 생성된 일기 확인:', dateString);
       console.log('📅 selectedDate:', selectedDate.toISOString());
       console.log('📅 currentDiaryId:', currentDiaryId);
-      router.push(`/diary/view?date=${dateString}`);
+      
+      // DB에서 일기 다시 조회해서 확인
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('diaries')
+        .select('*')
+        .eq('id', currentDiaryId)
+        .single();
+      
+      if (verifyError) {
+        console.error('❌ 일기 확인 실패:', verifyError);
+      } else {
+        console.log('✅ 일기 확인 성공:', verifyData);
+      }
+      
+      // view 페이지로 이동 (일기 ID와 함께)
+      setTimeout(() => {
+        console.log('🔄 view 페이지로 이동 중...');
+        console.log('📋 이동 정보:', { dateString, currentDiaryId });
+        router.push(`/diary/view?date=${dateString}&diary_id=${currentDiaryId}`);
+      }, 1000); // 1초 대기
 
     } catch (error) {
       console.error('일기 생성 중 오류:', error);
-      alert('일기 생성 중 오류가 발생했습니다.');
+      alert('일기 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsGenerating(false);
       setGenerationStep('');
@@ -1511,6 +1583,9 @@ export default function WriteDiary() {
                   rows={8}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
+                <div className="mt-2 text-xs text-gray-500">
+                  💡 일기 내용을 입력하면 아래 버튼이 활성화됩니다.
+                </div>
               </div>
 
               {/* 보상 정보 표시 */}
@@ -1577,16 +1652,20 @@ export default function WriteDiary() {
                 className={`w-full font-semibold py-3 px-4 rounded-lg transition-colors ${
                   isGenerating 
                     ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-500 hover:bg-green-600 text-white'
+                    : diaryText.trim() === '' 
+                      ? 'bg-gray-300 cursor-not-allowed' 
+                      : 'bg-green-500 hover:bg-green-600 text-white'
                 }`}
                 onClick={handleGenerateDiary}
-                disabled={isGenerating}
+                disabled={isGenerating || diaryText.trim() === ''}
               >
                 {isGenerating ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                     일기 생성 중...
                   </div>
+                ) : diaryText.trim() === '' ? (
+                  '📝 일기 내용을 입력해주세요'
                 ) : (
                   '🚀 일기 생성'
                 )}
@@ -1597,9 +1676,12 @@ export default function WriteDiary() {
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center mb-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                    <span className="text-sm font-medium text-blue-800">진행 중...</span>
+                    <span className="text-sm font-medium text-blue-800">일기 생성 진행 중...</span>
                   </div>
-                  <p className="text-sm text-blue-700">{generationStep}</p>
+                  <p className="text-sm text-blue-700 mb-2">{generationStep}</p>
+                  <div className="text-xs text-blue-600 mb-2">
+                    💡 백엔드 서버가 실행되지 않아도 기본 일기 생성은 가능합니다.
+                  </div>
                   <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
                     <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
                   </div>

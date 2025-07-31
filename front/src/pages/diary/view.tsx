@@ -39,6 +39,7 @@ export default function DiaryView() {
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [aiLayout, setAiLayout] = useState<any>(null);
+  const [diaryId, setDiaryId] = useState<string | null>(null);
 
   // 한국 시간으로 날짜 문자열 생성
   const getKoreanDateString = (date: Date) => {
@@ -46,14 +47,18 @@ export default function DiaryView() {
     return koreanTime.toISOString().split('T')[0];
   };
 
-  // URL 파라미터에서 날짜 가져오기
+  // URL 파라미터에서 날짜와 일기 ID 가져오기
   useEffect(() => {
     if (router.isReady) {
-      const { date } = router.query;
+      const { date, diary_id } = router.query;
       if (date && typeof date === 'string') {
         const parsedDate = new Date(date);
         console.log(`📅 view URL에서 날짜 파싱: ${date} → ${parsedDate.toISOString()}`);
         setSelectedDate(parsedDate);
+      }
+      if (diary_id && typeof diary_id === 'string') {
+        console.log(`📅 view URL에서 일기 ID 파싱: ${diary_id}`);
+        setDiaryId(diary_id);
       }
     }
   }, [router.isReady, router.query]);
@@ -75,18 +80,43 @@ export default function DiaryView() {
         console.log(`📅 view 일기 데이터 로드: ${selectedDate.toISOString()} → ${dateString}`);
         console.log(`📅 사용자 ID: ${userData.user.id}`);
 
-        // 일기 데이터 가져오기
-        const { data: diaryData, error: diaryError } = await supabase
-          .from('diaries')
-          .select('*')
-          .eq('user_id', userData.user.id)
-          .eq('date', dateString)
-          .maybeSingle();
+        // 일기 데이터 가져오기 (diary_id가 있으면 직접 조회, 없으면 날짜로 조회)
+        let diaryData, diaryError;
+        
+        if (diaryId) {
+          console.log(`🔍 일기 ID로 직접 조회: ${diaryId}`);
+          const result = await supabase
+            .from('diaries')
+            .select('*')
+            .eq('id', diaryId)
+            .eq('user_id', userData.user.id)
+            .maybeSingle();
+          diaryData = result.data;
+          diaryError = result.error;
+        } else {
+          console.log(`🔍 날짜로 일기 조회: user_id=${userData.user.id}, date=${dateString}`);
+          const result = await supabase
+            .from('diaries')
+            .select('*')
+            .eq('user_id', userData.user.id)
+            .eq('date', dateString)
+            .maybeSingle();
+          diaryData = result.data;
+          diaryError = result.error;
+        }
 
         console.log(`📅 일기 조회 결과:`, diaryData ? '찾음' : '없음', diaryError);
+        console.log(`📅 일기 상태:`, diaryData?.status);
+        console.log(`📅 일기 데이터:`, diaryData);
 
         if (diaryError) {
           console.error('일기 데이터 로드 실패:', diaryError);
+          console.error('일기 데이터 로드 실패 상세:', {
+            message: diaryError.message,
+            details: diaryError.details,
+            hint: diaryError.hint,
+            code: diaryError.code
+          });
           return;
         }
 
@@ -129,7 +159,41 @@ export default function DiaryView() {
     if (selectedDate) {
       loadDiaryData();
     }
-  }, [selectedDate, router]);
+  }, [selectedDate, diaryId, router]);
+
+  // 카드 타입별 배경색과 스타일 가져오기
+  const getCardStyle = (sourceType: string) => {
+    switch (sourceType) {
+      case 'custom':
+        return {
+          bg: 'bg-gradient-to-br from-pink-50 to-rose-50',
+          border: 'border-pink-200',
+          text: 'text-pink-700',
+          shadow: 'shadow-pink-100'
+        };
+      case 'chrome':
+        return {
+          bg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
+          border: 'border-blue-200',
+          text: 'text-blue-700',
+          shadow: 'shadow-blue-100'
+        };
+      case 'widget':
+        return {
+          bg: 'bg-gradient-to-br from-green-50 to-emerald-50',
+          border: 'border-green-200',
+          text: 'text-green-700',
+          shadow: 'shadow-green-100'
+        };
+      default:
+        return {
+          bg: 'bg-gradient-to-br from-gray-50 to-slate-50',
+          border: 'border-gray-200',
+          text: 'text-gray-700',
+          shadow: 'shadow-gray-100'
+        };
+    }
+  };
 
   // AI 레이아웃 그리드 렌더링
   const renderAiLayoutGrid = () => {
@@ -144,55 +208,67 @@ export default function DiaryView() {
     }
 
     return (
-      <div className="grid grid-cols-4 gap-3 p-4 bg-blue-50 rounded-lg">
+      <div className="grid grid-cols-4 gap-4 p-6 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl">
         {grid.map((row, rowIndex) => 
-          row.map((cell, colIndex) => (
-            <div
-              key={`${rowIndex}-${colIndex}`}
-              className={`
-                aspect-square border-2 rounded-lg p-2 flex items-center justify-center text-xs
-                ${cell ? 'border-blue-400 bg-white shadow-sm' : 'border-gray-200 bg-white'}
-              `}
-            >
-              {cell ? (
-                <div className="text-center w-full">
-                  <div className="font-medium text-blue-800 truncate text-xs">
-                    {(() => {
-                      const card = cards.find(c => c.id === cell.cardId);
-                      if (!card) return '제목 없음';
-                      
-                      // 사용자 업로드 이미지의 경우 제목을 간단하게 표시
-                      if (card.source_type === 'custom') {
-                        return '사용자 이미지';
-                      }
-                      
-                      return card.text_final || '제목 없음';
-                    })()}
-                  </div>
-                  <div className="text-gray-500 text-xs mt-1">
-                    {(() => {
-                      const sourceType = cards.find(c => c.id === cell.cardId)?.source_type;
-                      if (sourceType === 'custom') return '사용자 업로드';
-                      if (sourceType === 'chrome') return '브라우징';
-                      if (sourceType === 'widget') return '위젯';
-                      return sourceType || 'unknown';
-                    })()}
-                  </div>
-                  {cards.find(c => c.id === cell.cardId)?.image_url && (
-                    <div className="mt-1">
-                      <img
-                        src={cards.find(c => c.id === cell.cardId)?.image_url}
-                        alt="카드 이미지"
-                        className="w-12 h-12 object-cover rounded mx-auto"
-                      />
+          row.map((cell, colIndex) => {
+            const card = cell ? cards.find(c => c.id === cell.cardId) : null;
+            const cardStyle = card ? getCardStyle(card.source_type) : null;
+            
+            return (
+              <div
+                key={`${rowIndex}-${colIndex}`}
+                className={`
+                  aspect-square rounded-2xl p-3 flex items-center justify-center text-xs
+                  ${cell 
+                    ? `${cardStyle.bg} ${cardStyle.border} border-2 ${cardStyle.shadow} shadow-lg` 
+                    : 'bg-white/50 border-2 border-gray-100'
+                  }
+                  transition-all duration-200 hover:scale-105
+                `}
+              >
+                {cell ? (
+                  <div className="text-center w-full h-full flex flex-col justify-between">
+                    <div className="flex-1 flex flex-col justify-center">
+                      <div className={`font-medium truncate text-xs mb-1 ${cardStyle.text}`}>
+                        {(() => {
+                          if (!card) return '제목 없음';
+                          
+                          // 사용자 업로드 이미지의 경우 설명만 표시
+                          if (card.source_type === 'custom') {
+                            return card.text_final || '';
+                          }
+                          
+                          return card.text_final || '제목 없음';
+                        })()}
+                      </div>
+                      <div className="text-gray-500 text-xs">
+                        {(() => {
+                          const sourceType = card?.source_type;
+                          // 사용자 업로드 이미지의 경우 카테고리 표시하지 않음
+                          if (sourceType === 'custom') return '';
+                          if (sourceType === 'chrome') return '브라우징';
+                          if (sourceType === 'widget') return '위젯';
+                          return sourceType || 'unknown';
+                        })()}
+                      </div>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-gray-400 text-xs"></div>
-              )}
-            </div>
-          ))
+                    
+                    {card?.image_url && (
+                      <div className="mt-2 flex justify-center">
+                        <img
+                          src={card.image_url}
+                          alt="카드 이미지"
+                          className="w-24 h-24 object-cover rounded-xl shadow-md"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-gray-300 text-xs"></div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     );
@@ -220,7 +296,7 @@ export default function DiaryView() {
     );
   }
 
-  if (!diary || diary.status !== 'finalized') {
+  if (!diary) {
     return (
       <>
         <Head>

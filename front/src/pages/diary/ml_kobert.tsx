@@ -8,7 +8,13 @@ const fetchSentiment = async (text: string) => {
     return response.data;
   } catch (error) {
     console.error('감정 분석 API 호출 실패:', error);
-    return null;
+    // API 호출 실패 시 기본값 반환
+    return {
+      valence: 0.0,
+      arousal: 0.0,
+      emotion_label: 'neutral',
+      confidence: 0.0
+    };
   }
 };
 
